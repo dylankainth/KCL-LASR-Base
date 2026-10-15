@@ -111,7 +111,8 @@ what limits success; the numbers are within the spread expected from 30 episodes
 `park.py` squares the robot to the table edge (depth camera) and shifts it so the object and pad land in the trained
 region. From random displacements (+-12 cm, +-10 cm, +-8 deg): 8 of 10 trials ended inside the trained region
 (9 of 10 within 1 cm), final yaw within about 1.3 deg (`results/parking/`). Parking followed by the scripted expert's
-pick-and-place: see `REAL_ROBOT.md` section 8. The simulated base slips at low speed and its odometry over-reports
+pick-and-place (12 fresh-sim runs): 12/12 parked in the region, 9/12 completed the pick-and-place (see
+`REAL_ROBOT.md` section 8 for the failures). The simulated base slips at low speed and its odometry over-reports
 rotation, so these tests use Gazebo's ground-truth odometry as a stand-in for the real robot's.
 
 The real-robot path is described in `REAL_ROBOT.md` (nothing here has run on the real TIAGo).

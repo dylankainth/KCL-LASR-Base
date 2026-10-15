@@ -1,0 +1,53 @@
+[
+ {
+  "trial": 0,
+  "start": [
+   0.043,
+   -0.092,
+   -0.125
+  ],
+  "end": [
+   0.016,
+   -0.056,
+   -0.009
+  ],
+  "yaw_end_deg": -0.53,
+  "ok": true,
+  "iterations": 4,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.653,
+   0.127
+  ],
+  "pad_base": [
+   0.632,
+   -0.124
+  ],
+  "pnp_info": {
+   "success": true,
+   "fell": false,
+   "steps": 95
+  },
+  "pnp_closes": [
+   [
+    0.0237,
+    -0.0614,
+    -0.0018
+   ]
+  ],
+  "pnp_final_obj_world": [
+   0.653,
+   -0.184,
+   0.865
+  ],
+  "pnp_final_hand_base": [
+   0.631,
+   -0.119,
+   1.031
+  ],
+  "pnp_success": true,
+  "pnp_steps": 95
+ }
+]

@@ -214,7 +214,10 @@ class PickPlaceEnv:
                 target = arm.hand_pos() + lead * (0.04 / n)
         want_close = bool(action[3] > 0.5) and not self.no_close
         if want_close and not self.grip_cmd and sc.sim:  # log how well aligned the grasp really is
-            rel = sc.truth_pos(OBJECT_NAME) - arm.hand_pos()
+            bx, by, byaw = sc.truth_pose2d("tiago")  # the truth is in the world frame, the hand in the base frame
+            d = sc.truth_pos(OBJECT_NAME) - np.array([bx, by, 0.0])
+            c, s_ = np.cos(-byaw), np.sin(-byaw)
+            rel = np.array([c * d[0] - s_ * d[1], s_ * d[0] + c * d[1], d[2]]) - arm.hand_pos()
             self.close_log.append([float(rel[0]), float(rel[1]), float(rel[2] + GRASP_DZ)])
         if want_close != self.grip_cmd:
             self.grip_cmd = want_close

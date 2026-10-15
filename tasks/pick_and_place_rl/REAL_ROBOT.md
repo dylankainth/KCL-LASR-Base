@@ -155,7 +155,7 @@ real camera topics/colours/accuracy, real latency, the real base's low-speed beh
 | :--- | :--- |
 | Table edge fit (operating head pose) | edge within 0.5 cm of the true 0.55 m; yaw within 0.06 deg; synthetic +-4 deg rotations recovered |
 | Auto-park from random displacement (+-12 cm, +-10 cm, +-8 deg), 10 trials | 8/10 ended with the object and pad inside the trained region (9/10 within 1 cm); final yaw within ~1.3 deg |
-| Park + scripted expert pick-and-place (4 separate runs) | 4/4 parked inside the region; 3/4 completed the pick-and-place |
+| Park, then scripted-expert pick-and-place (12 separate fresh-sim runs, seeds 31-40; `results/parking/parkpnp*.json`) | 12/12 parked inside the trained region; **9/12** completed the pick-and-place. Seeds 31 and 37 each failed once and succeeded once on rerun (the sim is not deterministic); in the seed-39 failure the first grasp was aligned within 1 cm and the can still ended up off the table (simulated contact physics). With 12 runs this cannot be told apart from the ~93 % the expert reaches without parking (28/30 under camera-like noise). |
 | Action-interface commands (arm, torso, gripper, head) | 3/3 expert episodes |
 
 Results are from one simulated robot with ground-truth odometry standing in for the real wheel odometry during the
