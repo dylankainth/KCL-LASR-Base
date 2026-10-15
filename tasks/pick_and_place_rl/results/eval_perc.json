@@ -1,0 +1,127 @@
+{
+ "policy": "data/policy1.npz",
+ "successes": 19,
+ "episodes": 20,
+ "results": [
+  {
+   "episode": 0,
+   "success": true,
+   "steps": 84,
+   "place_error_m": 0.02284582064055499
+  },
+  {
+   "episode": 1,
+   "success": true,
+   "steps": 106,
+   "place_error_m": 0.0035371830905594425
+  },
+  {
+   "episode": 2,
+   "success": true,
+   "steps": 97,
+   "place_error_m": 0.00406730271498176
+  },
+  {
+   "episode": 3,
+   "success": true,
+   "steps": 88,
+   "place_error_m": 0.03112409863865823
+  },
+  {
+   "episode": 4,
+   "success": true,
+   "steps": 77,
+   "place_error_m": 0.0012132526909554714
+  },
+  {
+   "episode": 5,
+   "success": true,
+   "steps": 91,
+   "place_error_m": 0.001404113123020544
+  },
+  {
+   "episode": 6,
+   "success": true,
+   "steps": 80,
+   "place_error_m": 0.0035745888067083066
+  },
+  {
+   "episode": 7,
+   "success": true,
+   "steps": 80,
+   "place_error_m": 0.0024258670728614573
+  },
+  {
+   "episode": 8,
+   "success": true,
+   "steps": 87,
+   "place_error_m": 0.005232423126475761
+  },
+  {
+   "episode": 9,
+   "success": false,
+   "steps": 250,
+   "place_error_m": 0.0841196494325816
+  },
+  {
+   "episode": 10,
+   "success": true,
+   "steps": 103,
+   "place_error_m": 0.004001102779228592
+  },
+  {
+   "episode": 11,
+   "success": true,
+   "steps": 83,
+   "place_error_m": 0.0023856178308765243
+  },
+  {
+   "episode": 12,
+   "success": true,
+   "steps": 80,
+   "place_error_m": 0.0038020558494999183
+  },
+  {
+   "episode": 13,
+   "success": true,
+   "steps": 76,
+   "place_error_m": 0.01742011399845667
+  },
+  {
+   "episode": 14,
+   "success": true,
+   "steps": 92,
+   "place_error_m": 0.03441734848305599
+  },
+  {
+   "episode": 15,
+   "success": true,
+   "steps": 79,
+   "place_error_m": 0.0021744359802743276
+  },
+  {
+   "episode": 16,
+   "success": true,
+   "steps": 95,
+   "place_error_m": 0.009566014054633936
+  },
+  {
+   "episode": 17,
+   "success": true,
+   "steps": 76,
+   "place_error_m": 0.005037615175183175
+  },
+  {
+   "episode": 18,
+   "success": true,
+   "steps": 79,
+   "place_error_m": 0.035571831409119355
+  },
+  {
+   "episode": 19,
+   "success": true,
+   "steps": 104,
+   "place_error_m": 0.002741475641331775
+  }
+ ]
+}

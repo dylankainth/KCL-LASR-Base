@@ -70,6 +70,23 @@ trained by behaviour cloning on the expert's labels; DAgger rounds relabel the s
 No reinforcement learning was used: with a privileged-state expert and Gazebo running at ~1x real time, imitation
 (BC + DART + DAgger) needs ~10^4 samples, where RL would need orders of magnitude more simulator time.
 
+### With camera perception and noise (Gazebo)
+
+| Test | Policy | Success |
+| :--- | :--- | :--- |
+| Poses from the head-camera pipeline (`perception_node`), seed 777 | `policy.npz` | 19 / 20 (1.0 cm mean place error) |
+| Same, 30 episodes | `policy_noise_dagger.npz` | 24 / 30 |
+| Camera-like noise on the observation (1 cm bias, 4 mm jitter, stale frames), seed 778 | `policy.npz` | 25 / 30 |
+| Same | `policy_noise_dagger.npz` | 21 / 30 |
+| Same | scripted expert | 24 / 30 |
+
+Perception alone (`perception_check`): object 0.55 cm, pad 0.16 cm mean error over 20 random placements, no misses.
+The extra DAgger round with noisy observations (`policy_noise_dagger.npz`) did **not** help, so `policy.npz` stays
+the default. The expert is no better than the policy under this noise, so the noise level, not the network, is
+what limits success; the numbers are within the spread expected from 30 episodes. Results files are in `results/`.
+
+The real-robot path is described in `REAL_ROBOT.md` (nothing here has run on the real TIAGo).
+
 Caveats: ground-truth poses (no perception), a grasp-assist joint (see above), fixed object shape, and
 evaluation on the same table/pad regions used for training. Run `scripts/run_lasr.sh` etc. from the WSL host
 (they assume the layout in `documentation/WSL_APPTAINER_SETUP.md`).
