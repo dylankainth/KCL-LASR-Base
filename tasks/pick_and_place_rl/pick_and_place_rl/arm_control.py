@@ -9,9 +9,12 @@ TORSO_HEIGHT = 0.35
 # A comfortable arm configuration with the hand over the table, used as the IK
 # nullspace posture so the redundant arm always resolves to the same "elbow".
 Q_SEED = np.array([TORSO_HEIGHT, 1.05, 0.57, -0.83, 1.7, 0.64, -0.89, 0.72])
-# Hand waypoint (base frame) that is clear of the tucked arm, the robot and the table.
-SAFE_HAND = np.array([0.40, -0.05, 1.10])
-HOVER_Z = 1.00  # hand height used for travelling above the table
+# Joint waypoints (torso, arm_1..7) of PAL's `home` motion, used in reverse to leave the tuck pose.
+Q_WRIST = np.array([TORSO_HEIGHT, 0.5, -1.34, -0.48, 1.94, -1.49, 1.37, -1.58])
+Q_UNFOLD = np.array([TORSO_HEIGHT, 0.2, 0.35, -0.2, 1.94, -1.57, 1.37, -1.58])
+# Hand height for travelling above the table. Fingertips hang ~0.10 m below the hand frame and the
+# object top is at 0.915, so this keeps them ~3 cm clear.
+HOVER_Z = 1.05
 
 
 class ArmController:
@@ -68,19 +71,54 @@ class ArmController:
         self.sc.sleep(wait)
 
     # ------------------------------------------------------------ safe routing
-    def go_ready(self, over_xy=(0.75, 0.0)):
-        """From any arm configuration to hovering above the table, collision-free.
+    def go_ready(self, over_xy=(0.62, 0.0)):
+        """From the tucked arm to hovering above the table, without touching it.
 
-        The tucked arm has its hand under where a table could be, so first lift the
-        hand to a point above and in front of the robot (joint-space move), then
-        travel horizontally at hover height.
+        Follows PAL's own `home` motion in reverse (rotate the wrist, then unfold the
+        arm out to the side, where nothing is in the way), then rises high and crosses
+        over the table edge in Cartesian space before settling to the hover height.
         """
         sc = self.sc
         sc.send_gripper(0.045, 1.0)
         sc.send_torso(TORSO_HEIGHT, 3.0)
         sc.sleep(3.5)
-        q_safe, _ = self.ik(SAFE_HAND, q0=Q_SEED, iters=400)
-        sc.send_arm(q_safe[1:], 6.0)
-        sc.sleep(6.5)
+        sc.send_arm(Q_WRIST[1:], 3.0)
+        sc.sleep(3.5)
+        sc.send_arm(Q_UNFOLD[1:], 5.0)
+        sc.sleep(5.5)
         self.q_cmd = sc.q().copy()
-        self.move_to([over_xy[0], over_xy[1], HOVER_Z], speed=0.12)
+        h = self.hand_pos()
+        self.move_to([0.26, h[1], 1.15], speed=0.15)  # straight up, still beside the robot
+        self.move_to([0.26, -0.15, 1.15], speed=0.15)
+        self.move_to([0.50, -0.15, 1.15], speed=0.15)  # across the table edge, high
+        self.move_to([over_xy[0], over_xy[1], 1.15], speed=0.15)
+        self.reseed([over_xy[0], over_xy[1], HOVER_Z])
+
+    def reseed(self, target, tries=30, seed=0):
+        """Move (joint space, high above the table) to a clean IK solution for `target`.
+
+        The incremental IK can end up in a poor local minimum (wrist joints at their limits,
+        hand tilted). Solving from random restarts and picking the solution closest to
+        `Q_SEED` puts the arm back on a well-conditioned branch.
+        """
+        rng = np.random.default_rng(seed)
+        best = None
+        for k in range(tries):
+            q0 = Q_SEED if k == 0 else np.clip(
+                Q_SEED + np.r_[0.0, rng.normal(0, 0.5, 7)], self.chain.lower, self.chain.upper
+            )
+            q, ok = solve_ik(
+                self.chain, q0, np.asarray(target, float), self.r_down,
+                q_pref=Q_SEED, pref_gain=0.2, free=self.free, max_iters=300,
+            )
+            if not ok:
+                continue
+            cost = np.linalg.norm((q - Q_SEED)[1:])
+            if best is None or cost < best[0]:
+                best = (cost, q)
+        if best is None:
+            raise RuntimeError(f"no IK solution for {target}")
+        q = best[1]
+        self.sc.send_arm(q[1:], 4.0)
+        self.sc.sleep(4.5)
+        self.q_cmd = self.sc.q().copy()

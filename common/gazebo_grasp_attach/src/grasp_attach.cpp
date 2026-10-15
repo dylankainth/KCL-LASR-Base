@@ -99,15 +99,16 @@ private:
       RCLCPP_WARN(node_->get_logger(), "attach: link not found (%s / %s)", link1.c_str(), link2.c_str());
       return;
     }
-    // A zero-limit revolute joint is the robust way to get a rigid joint in Gazebo 11.
-    auto joint = world_->Physics()->CreateJoint("revolute", m1);
+    auto joint = world_->Physics()->CreateJoint("fixed", m1);
     joint->SetName("grasp_attach_" + std::to_string(joints_.size()) + "_" + model2);
     joint->SetModel(m2);
     joint->Load(l1, l2, ignition::math::Pose3d());
     joint->Init();
-    joint->SetAxis(0, ignition::math::Vector3d(0, 0, 1));
-    joint->SetUpperLimit(0, 0);
-    joint->SetLowerLimit(0, 0);
+    // Stiff constraint: the arm is driven kinematically, so a soft joint lets the object lag.
+    joint->SetParam("cfm", 0, 0.0);
+    joint->SetParam("erp", 0, 0.9);
+    joint->SetParam("stop_cfm", 0, 0.0);
+    joint->SetParam("stop_erp", 0, 0.9);
     joints_[key] = joint;
     RCLCPP_INFO(node_->get_logger(), "attached %s", key.c_str());
   }

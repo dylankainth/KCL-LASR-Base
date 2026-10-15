@@ -152,10 +152,10 @@ class TiagoScene:
     # ------------------------------------------------------------------ grasp assist
     def attach_object(self):
         """Rigidly attach the object to the gripper (see gazebo_grasp_attach)."""
-        self._attach_pub.publish(String(data=f"attach tiago wrist_ft_link {OBJECT_NAME} link"))
+        self._attach_pub.publish(String(data=f"attach tiago arm_7_link {OBJECT_NAME} link"))
 
     def detach_object(self):
-        self._attach_pub.publish(String(data=f"detach tiago wrist_ft_link {OBJECT_NAME} link"))
+        self._attach_pub.publish(String(data=f"detach tiago arm_7_link {OBJECT_NAME} link"))
 
     # ------------------------------------------------------------------ scene
     def set_model_pos(self, name: str, pos, yaw: float = 0.0):
