@@ -165,6 +165,7 @@ class PickPlaceEnv:
         sc.sleep(0.6)
         if sc.use_perception:  # the robot sees the new scene through the camera pipeline
             sc.unlatch_object()
+            sc.unlatch_pad()
             sc.sleep(0.5)
             if not sc.wait_perception(timeout=20.0, max_age=2.0):
                 raise RuntimeError("perception did not see the object and pad after the reset")
@@ -184,6 +185,7 @@ class PickPlaceEnv:
             arm.move_to([h[0], h[1], HOVER_Z], speed=0.1)
             arm.move_to([hand_xy[0], hand_xy[1], HOVER_Z], speed=0.1)
         sc.unlatch_object()
+        sc.unlatch_pad()
         if not sc.wait_perception(timeout=30.0):
             raise RuntimeError("perception never saw both the object and the pad")
         sc.sleep(1.0)
@@ -196,6 +198,11 @@ class PickPlaceEnv:
         action = np.asarray(action, float)
         delta = np.clip(action[:3], -MAX_STEP, MAX_STEP) * self.step_scale
         target = np.clip(arm.cmd_hand_pos() + delta, WORKSPACE_LO, WORKSPACE_HI)
+        if not sc.sim:  # real arm: never let the command run more than 4 cm ahead of the measured hand
+            lead = target - arm.hand_pos()
+            n = np.linalg.norm(lead)
+            if n > 0.04:
+                target = arm.hand_pos() + lead * (0.04 / n)
         want_close = bool(action[3] > 0.5)
         if want_close != self.grip_cmd:
             self.grip_cmd = want_close

@@ -3,7 +3,7 @@
 import numpy as np
 
 from pick_and_place_rl.kinematics import rotation_from_axes, solve_ik
-from pick_and_place_rl.robot import APPROACH_LOCAL, FINGER_LOCAL, TiagoScene
+from pick_and_place_rl.robot import APPROACH_LOCAL, FINGER_LOCAL, ROUTE_JUMP, TiagoScene
 
 TORSO_HEIGHT = 0.35
 # A comfortable arm configuration with the hand over the table, used as the IK
@@ -15,6 +15,7 @@ Q_UNFOLD = np.array([TORSO_HEIGHT, 0.2, 0.35, -0.2, 1.94, -1.57, 1.37, -1.58])
 # Hand height for travelling above the table. Fingertips hang ~0.10 m below the hand frame and the
 # object top is at 0.915, so this keeps them ~3 cm clear.
 HOVER_Z = 1.05
+STEP_DQ = 0.08  # rad, per-step joint change limit on the real arm
 
 
 class ArmController:
@@ -60,7 +61,13 @@ class ArmController:
 
     def servo(self, target, dt=0.1):
         """One control step: IK toward `target`, command the arm, advance sim time."""
-        self.q_cmd, _ = self.ik(target)
+        q_new, _ = self.ik(target)
+        if not self.sc.sim:
+            # Real arm: the IK's posture preference can ask for a large joint change in one step.
+            # Spread it over many steps instead.
+            lim = min(STEP_DQ, self.sc.max_joint_speed * dt)  # never command faster than the speed limit
+            q_new = self.q_cmd + np.clip(q_new - self.q_cmd, -lim, lim)
+        self.q_cmd = q_new
         self.sc.send_arm(self.q_cmd[1:], dt * 1.5)
         self.sc.sleep(dt)
 
@@ -71,6 +78,11 @@ class ArmController:
         n = max(1, int(np.linalg.norm(target - cur) / (speed * dt)))
         for k in range(1, n + 1):
             self.servo(cur + (target - cur) * k / n, dt)
+        if not self.sc.sim:  # the speed-limited command may trail the waypoint: keep going until it arrives
+            for _ in range(300):
+                if np.linalg.norm(self.cmd_hand_pos() - target) < 0.005:
+                    break
+                self.servo(target, dt)
         self.sc.sleep(settle)
 
     def grip(self, opening, wait=1.2):
@@ -87,12 +99,9 @@ class ArmController:
         """
         sc = self.sc
         sc.send_gripper(0.045, 1.0)
-        sc.send_torso(TORSO_HEIGHT, 3.0)
-        sc.sleep(3.5)
-        sc.send_arm(Q_WRIST[1:], 3.0)
-        sc.sleep(3.5)
-        sc.send_arm(Q_UNFOLD[1:], 5.0)
-        sc.sleep(5.5)
+        sc.sleep(0.5 + sc.send_torso(TORSO_HEIGHT, 3.0))
+        sc.sleep(0.5 + sc.send_arm(Q_WRIST[1:], 3.0, max_jump=ROUTE_JUMP))
+        sc.sleep(0.5 + sc.send_arm(Q_UNFOLD[1:], 5.0, max_jump=ROUTE_JUMP))
         self.q_cmd = sc.q().copy()
         h = self.hand_pos()
         self.move_to([0.26, h[1], 1.15], speed=0.15)  # straight up, still beside the robot
@@ -126,6 +135,5 @@ class ArmController:
         if best is None:
             raise RuntimeError(f"no IK solution for {target}")
         q = best[1]
-        self.sc.send_arm(q[1:], 4.0)
-        self.sc.sleep(4.5)
+        self.sc.sleep(0.5 + self.sc.send_arm(q[1:], 4.0, max_jump=ROUTE_JUMP))
         self.q_cmd = self.sc.q().copy()

@@ -24,9 +24,10 @@ FINGER_JOINTS = ["gripper_right_finger_joint", "gripper_left_finger_joint"]
 CHAIN_JOINTS = [TORSO_JOINT] + ARM_JOINTS
 OBJECT_NAME = "pick_object"
 PAD_NAME = "place_pad"
-OCCLUSION_RADIUS = 0.10  # real robot: hand within this xy distance of the object -> latch the estimate
-OCCLUSION_HEIGHT = 1.02  # ... and below this hand height
-MAX_JUMP = 1.2  # rad, refuse any joint command further than this from the measured state
+OCCLUSION_RADIUS = 0.15  # hand within this xy distance of the latched estimate -> ignore new detections
+OCCLUSION_HEIGHT = 1.35  # ... and below this hand height (the camera sits ~1.3 m up)
+MAX_JUMP = 0.35  # rad, refuse a servo command further than this from the measured state
+ROUTE_JUMP = 3.5  # rad, limit for the scripted routes (PAL's unfold rotates the wrist ~1.6 rad); still speed-limited
 GRASP_DZ = 0.06  # hand height above the object's centre when grasping (same as env.GRASP_DZ)
 GRIPPER_OPEN = 0.045
 GRIPPER_CLOSED = 0.0
@@ -137,13 +138,14 @@ class TiagoScene:
         with self._lock:
             have_q = all(j in self._joints for j in CHAIN_JOINTS)
             q = np.array([self._joints[j] for j in CHAIN_JOINTS]) if have_q else None
-        if name == OBJECT_NAME and q is not None:
-            if self.carrying:
+        if q is not None:
+            if name == OBJECT_NAME and self.carrying:
                 return
-            hand = self.chain.fk(q)[:3, 3]
-            if np.linalg.norm(hand[:2] - p[:2]) < OCCLUSION_RADIUS and hand[2] < OCCLUSION_HEIGHT:
-                if OBJECT_NAME in self._perc:
-                    return  # the gripper is over the object: keep the last clean estimate
+            ref = self._perc.get(name)
+            if ref is not None:
+                hand = self.chain.fk(q)[:3, 3]
+                if np.linalg.norm(hand[:2] - ref[:2]) < OCCLUSION_RADIUS and hand[2] < OCCLUSION_HEIGHT:
+                    return  # the hand/can is between the camera and the target: keep the last clean estimate
         with self._lock:
             self._perc[name] = p
             self._est_time[name] = time.time()
@@ -171,6 +173,11 @@ class TiagoScene:
                 return True
             time.sleep(0.1)
         return False
+
+    def unlatch_pad(self):
+        with self._lock:
+            self._perc.pop(PAD_NAME, None)
+            self._est_time.pop(PAD_NAME, None)
 
     def unlatch_object(self):
         """Real robot: forget the latched object estimate so the next detection is accepted."""
@@ -234,24 +241,26 @@ class TiagoScene:
         msg.points = [pt]
         pub.publish(msg)
 
-    def _limited_duration(self, names, target, duration):
+    def _limited_duration(self, names, target, duration, max_jump=MAX_JUMP):
         """Real robot: stretch the duration so no joint exceeds the speed limit; refuse jumps."""
         with self._lock:
             cur = np.array([self._joints[j] for j in names])
         d = np.abs(np.asarray(target, float) - cur)
-        if d.max() > MAX_JUMP:
+        if d.max() > max_jump:
             raise RuntimeError(f"refusing a {d.max():.2f} rad jump on {names[int(d.argmax())]}")
         return max(duration, float(d.max() / self.max_joint_speed))
 
-    def send_arm(self, q_arm, duration=0.15):
+    def send_arm(self, q_arm, duration=0.15, max_jump=MAX_JUMP):
         if not self.sim:
-            duration = self._limited_duration(ARM_JOINTS, q_arm, duration)
+            duration = self._limited_duration(ARM_JOINTS, q_arm, duration, max_jump)
         self._send(self._arm_pub, ARM_JOINTS, q_arm, duration)
+        return duration  # the duration actually used (longer than asked if the speed limit applied)
 
     def send_torso(self, height, duration=1.0):
         if not self.sim:
             duration = max(duration, abs(height - self.q()[0]) / 0.05)  # torso <= 5 cm/s
         self._send(self._torso_pub, [TORSO_JOINT], [height], duration)
+        return duration
 
     def send_head(self, pan, tilt, duration=2.0):
         self._send(self._head_pub, ["head_1_joint", "head_2_joint"], [pan, tilt], duration)

@@ -116,6 +116,11 @@ def main():
             print(f"  -> perception says {info.get('success')}, human says {verdict}")
     except KeyboardInterrupt:
         print("\nInterrupted: holding the arm where it is.")
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        print("\nERROR: holding the arm where it is.", flush=True)
     finally:
         try:
             sc.send_arm(sc.q()[1:], 0.5)  # hold the current pose

@@ -71,6 +71,24 @@ python3 -m pick_and_place_rl.run_real --policy models/policy.npz --episodes 5 --
 `run_real` asks before moving, aims the head at the table, shows what it perceives, and asks again before every
 episode. Ctrl-C holds the arm in place.
 
+## 3b. What was rehearsed (Gazebo standing in for the robot)
+
+`python3 -m pick_and_place_rl.rehearsal --expert` runs `perception_node` + `run_real` through the same code path as
+the real robot (wall clock, no teleporting, camera poses, speed limits, scripted "human" prompts). It found and
+fixed four problems that plain simulation had hidden:
+
+1. waits after trajectories were fixed, but the speed limit stretches them (the route would have moved on early);
+2. one servo step could ask for a 1.5 rad joint change (the IK pulls toward its seed posture): the guard refused it,
+   and steps are now capped by the speed limit;
+3. the speed-limited command trails the waypoint, so each move now runs until the target is reached;
+4. when the hand passes between the camera and the can, the estimate shifted and the hand chased it. Detections are
+   now ignored while the hand is within 15 cm of the latched target.
+
+After the fixes the rehearsal ran end to end: unfold, hover, descend on the perceived can (within 1 cm), close,
+carry, release on the pad, and retry when the can was not actually held. **Not covered: the grasp itself** (Gazebo's
+fingers cannot hold the can, and the grasp-assist joint is off in this mode), real controller names, real camera
+topics/colours, real latency.
+
 ## 4. What will most likely need tuning (in order)
 
 1. **Controller / topic names** [unverified]. The code publishes to `/arm_controller/joint_trajectory`,
