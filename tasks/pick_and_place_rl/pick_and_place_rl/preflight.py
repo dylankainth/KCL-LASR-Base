@@ -22,13 +22,7 @@ from tf2_ros import Buffer, TransformListener
 from pick_and_place_rl.kinematics import Chain
 from pick_and_place_rl.robot import CHAIN_JOINTS, FINGER_JOINTS
 
-NEED_TOPICS = [
-    "/joint_states",
-    "/arm_controller/joint_trajectory",
-    "/torso_controller/joint_trajectory",
-    "/gripper_controller/joint_trajectory",
-    "/head_controller/joint_trajectory",
-]
+NEED_TOPICS = ["/joint_states"]
 results = []
 
 
@@ -70,6 +64,18 @@ def main():
     topics = dict(node.get_topic_names_and_types())
     for t in NEED_TOPICS:
         check(f"topic {t}", t in topics)
+    check("base command topic /cmd_vel (needed for auto-park)", "/cmd_vel" in topics, "use --no-park if it is absent", hard=False)
+    odom = [t for t in ("/mobile_base_controller/odom", "/odom") if t in topics]
+    check("base odometry topic", bool(odom), ", ".join(odom) or "none of /mobile_base_controller/odom, /odom", hard=False)
+    from control_msgs.action import FollowJointTrajectory
+    from rclpy.action import ActionClient
+
+    for c in ("arm", "torso", "gripper", "head"):
+        cli = ActionClient(node, FollowJointTrajectory, f"/{c}_controller/follow_joint_trajectory")
+        has_action = cli.wait_for_server(timeout_sec=3.0)
+        has_topic = f"/{c}_controller/joint_trajectory" in topics
+        check(f"{c}_controller command interface", has_action or has_topic,
+              "follow_joint_trajectory action" if has_action else ("joint_trajectory topic only (fallback)" if has_topic else "neither found"))
     cams = sorted(t for t in topics if ("image_raw" in t or "camera_info" in t) and "head" in t)
     print("      camera-like topics:", *cams, sep="\n        ")
 

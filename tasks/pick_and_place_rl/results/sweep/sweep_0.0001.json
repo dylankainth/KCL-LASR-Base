@@ -1,0 +1,417 @@
+{
+ "policy": null,
+ "successes": 20,
+ "episodes": 20,
+ "results": [
+  {
+   "episode": 0,
+   "success": true,
+   "steps": 103,
+   "place_error_m": 0.004598636080259792,
+   "closes": [
+    [
+     -0.0014,
+     0.0003,
+     -0.0017
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.002,
+    -0.004,
+    -0.162
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 1,
+   "success": true,
+   "steps": 104,
+   "place_error_m": 0.00528375813644254,
+   "closes": [
+    [
+     0.0035,
+     -0.0047,
+     -0.0009
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.01,
+    -0.006,
+    -0.166
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 2,
+   "success": true,
+   "steps": 105,
+   "place_error_m": 0.004746819723966114,
+   "closes": [
+    [
+     -0.0005,
+     0.0051,
+     -0.0006
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.001,
+    -0.003,
+    -0.165
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 3,
+   "success": true,
+   "steps": 110,
+   "place_error_m": 0.0030234762248403245,
+   "closes": [
+    [
+     0.0031,
+     -0.0061,
+     -0.0009
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.002,
+    -0.003,
+    -0.162
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 4,
+   "success": true,
+   "steps": 91,
+   "place_error_m": 0.001938501878022158,
+   "closes": [
+    [
+     0.0028,
+     -0.0033,
+     -0.007
+    ],
+    [
+     0.0021,
+     -0.0026,
+     0.0027
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.002,
+    -0.002,
+    -0.163
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 5,
+   "success": true,
+   "steps": 122,
+   "place_error_m": 0.009006463692786036,
+   "closes": [
+    [
+     0.0036,
+     -0.0018,
+     -0.0076
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.002,
+    -0.01,
+    -0.167
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 6,
+   "success": true,
+   "steps": 104,
+   "place_error_m": 0.0043481192529747905,
+   "closes": [
+    [
+     0.004,
+     0.0009,
+     0.0048
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.002,
+    -0.002,
+    -0.161
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 7,
+   "success": true,
+   "steps": 158,
+   "place_error_m": 0.007113594471375539,
+   "closes": [
+    [
+     -0.0019,
+     0.0022,
+     -0.0014
+    ],
+    [
+     0.005,
+     0.0048,
+     0.006
+    ],
+    [
+     0.0028,
+     -0.0006,
+     -0.0044
+    ],
+    [
+     0.0008,
+     -0.0016,
+     -0.0044
+    ],
+    [
+     0.0028,
+     -0.0092,
+     0.008
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.003,
+    -0.003,
+    -0.166
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 8,
+   "success": true,
+   "steps": 86,
+   "place_error_m": 0.008085138316439922,
+   "closes": [
+    [
+     0.0042,
+     0.0005,
+     -0.001
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.005,
+    -0.001,
+    -0.165
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 9,
+   "success": true,
+   "steps": 108,
+   "place_error_m": 0.0073612833357341,
+   "closes": [
+    [
+     -0.0021,
+     0.0004,
+     -0.0026
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.003,
+    -0.002,
+    -0.158
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 10,
+   "success": true,
+   "steps": 122,
+   "place_error_m": 0.0025555872283721227,
+   "closes": [
+    [
+     0.0033,
+     -0.0009,
+     -0.0001
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.001,
+    -0.005,
+    -0.156
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 11,
+   "success": true,
+   "steps": 116,
+   "place_error_m": 0.00938118559397828,
+   "closes": [
+    [
+     0.0029,
+     -0.0014,
+     -0.0029
+    ],
+    [
+     0.005,
+     -0.0016,
+     0.0096
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.005,
+    -0.0,
+    -0.163
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 12,
+   "success": true,
+   "steps": 112,
+   "place_error_m": 0.005981980552120013,
+   "closes": [
+    [
+     -0.0054,
+     0.0012,
+     -0.0038
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.011,
+    -0.006,
+    -0.164
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 13,
+   "success": true,
+   "steps": 95,
+   "place_error_m": 0.007384534728765188,
+   "closes": [
+    [
+     -0.0001,
+     -0.0001,
+     -0.0053
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.007,
+    -0.007,
+    -0.162
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 14,
+   "success": true,
+   "steps": 108,
+   "place_error_m": 0.005206810459750483,
+   "closes": [
+    [
+     -0.0026,
+     -0.0023,
+     -0.0028
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.004,
+    -0.001,
+    -0.165
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 15,
+   "success": true,
+   "steps": 94,
+   "place_error_m": 0.01721483534818721,
+   "closes": [
+    [
+     -0.0008,
+     0.0068,
+     -0.0011
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.016,
+    -0.008,
+    -0.166
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 16,
+   "success": true,
+   "steps": 131,
+   "place_error_m": 0.009368210073472256,
+   "closes": [
+    [
+     -0.0017,
+     -0.006,
+     0.001
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.011,
+    -0.013,
+    -0.164
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 17,
+   "success": true,
+   "steps": 104,
+   "place_error_m": 0.004359066013864719,
+   "closes": [
+    [
+     0.0006,
+     0.0035,
+     -0.0011
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.002,
+    -0.007,
+    -0.164
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 18,
+   "success": true,
+   "steps": 127,
+   "place_error_m": 0.007795116335821468,
+   "closes": [
+    [
+     -0.006,
+     0.0024,
+     -0.0015
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.004,
+    -0.001,
+    -0.167
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 19,
+   "success": true,
+   "steps": 91,
+   "place_error_m": 0.011450648070977298,
+   "closes": [
+    [
+     -0.0002,
+     -0.0043,
+     -0.0027
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.006,
+    -0.002,
+    -0.159
+   ],
+   "final_attached": false
+  }
+ ]
+}

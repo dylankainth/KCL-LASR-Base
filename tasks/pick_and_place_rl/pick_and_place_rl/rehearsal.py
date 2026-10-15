@@ -16,10 +16,12 @@ import sys
 import time
 
 
-def place(name, x, y, z):
+def place(name, x, y, z, yaw=0.0):
+    import math
+
     req = (
-        "{state: {name: '%s', pose: {position: {x: %f, y: %f, z: %f}, orientation: {w: 1.0}}, "
-        "reference_frame: world}}" % (name, x, y, z)
+        "{state: {name: '%s', pose: {position: {x: %f, y: %f, z: %f}, orientation: {z: %f, w: %f}}, "
+        "reference_frame: world}}" % (name, x, y, z, math.sin(yaw / 2), math.cos(yaw / 2))
     )
     subprocess.run(
         ["ros2", "service", "call", "/gazebo/set_entity_state", "gazebo_msgs/srv/SetEntityState", req],
@@ -35,6 +37,9 @@ def main():
     ap.add_argument("--oy", type=float, default=0.15)
     ap.add_argument("--px", type=float, default=0.62)
     ap.add_argument("--py", type=float, default=-0.20)
+    ap.add_argument("--approach-only", action="store_true")
+    ap.add_argument("--displace", type=float, nargs=3, default=None, metavar=("X", "Y", "YAW_DEG"),
+                    help="teleport the base here first, so the run has to park itself")
     ap.add_argument("--speed-scale", type=float, default=0.3)
     ap.add_argument("--step-scale", type=float, default=0.4)
     args = ap.parse_args()
@@ -46,14 +51,22 @@ def main():
     try:
         place("pick_object", args.ox, args.oy, 0.867)
         place("place_pad", args.px, args.py, 0.8155)
+        if args.displace:
+            import math
+
+            place("tiago", args.displace[0], args.displace[1], 0.0, math.radians(args.displace[2]))
         time.sleep(2.0)
         cmd = [sys.executable, "-u", "-m", "pick_and_place_rl.run_real", "--episodes", "1", "--auto",
                "--speed-scale", str(args.speed_scale), "--step-scale", str(args.step_scale),
                "--max-steps", "700", "--report", "/ros_ws/data/rehearsal.json",
                "--urdf", "/ros_ws/scratch/tiago.urdf"]
         cmd += ["--expert"] if args.expert else ["--policy", args.policy]
-        # answers: Start? y | placed (Enter) | look right? y | succeeded? y
-        answers = "y\n\ny\ny\n"
+        if args.approach_only:
+            cmd += ["--approach-only"]
+        if args.displace:
+            cmd += ["--odom", "/ground_truth_odom"]  # Gazebo's wheel odometry slips at low speed; ground truth stands in
+        # answers: Start? y | arm tucked? y | placed (Enter) | [park: drive? y] | look right? y | succeeded? y
+        answers = "y\ny\n\n" + ("y\n" if args.displace else "") + "y\ny\n"
         r = subprocess.run(cmd, input=answers, text=True, capture_output=True, timeout=1500)
         print(r.stdout[-6000:])
         print(r.stderr[-3000:])

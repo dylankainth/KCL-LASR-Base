@@ -15,6 +15,10 @@ from pick_and_place_rl.robot import TiagoScene
 from pick_and_place_rl.video import VideoRecorder
 
 
+def arm_hand(env):
+    return env.arm.hand_pos()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--urdf", default="/ros_ws/scratch/tiago.urdf")
@@ -26,6 +30,8 @@ def main():
     ap.add_argument("--perception", action="store_true",
                     help="poses come from the head-camera pipeline (perception_node must run), not Gazebo")
     ap.add_argument("--obs-noise", action="store_true", help="corrupt the poses the policy sees (camera-like)")
+    ap.add_argument("--noise-bias", type=float, default=0.010, help="per-episode xy bias std (m) of the noise model")
+    ap.add_argument("--noise-jitter", type=float, default=0.004)
     ap.add_argument("--report", default=None, help="json file for per-episode results")
     args = ap.parse_args()
 
@@ -36,7 +42,8 @@ def main():
 
         start_inprocess(sc, urdf)
     env = PickPlaceEnv(sc, ArmController(sc), seed=args.seed,
-                       obs_noise=PerceptionNoise(args.seed) if args.obs_noise else None)
+                       obs_noise=PerceptionNoise(args.seed, bias_xy=args.noise_bias, bias_z=0.7 * args.noise_bias,
+                                                 jitter=args.noise_jitter) if args.obs_noise else None)
     policy = MLPPolicy.load(args.policy) if args.policy else None
     label = args.label or ("Learned policy (behaviour cloning + DAgger)" if policy else "Scripted expert")
     rec = VideoRecorder(sc, args.video, fps=20) if args.video else None
@@ -62,8 +69,12 @@ def main():
         o = sc.truth_pos("pick_object")
         p = sc.truth_pos("place_pad")
         err = float(np.linalg.norm(o[:2] - p[:2]))
-        results.append({"episode": ep, "success": bool(info["success"]), "steps": int(info["steps"]), "place_error_m": err})
-        print(f"ep {ep + 1}/{args.episodes} success={info['success']} steps={info['steps']} place_err={err * 100:.1f}cm wall={time.time() - t0:.0f}s", flush=True)
+        results.append({"episode": ep, "success": bool(info["success"]), "steps": int(info["steps"]), "place_error_m": err,
+                        "closes": [[round(c, 4) for c in cl] for cl in env.close_log],
+                        "final_obj_minus_hand": (o - arm_hand(env)).round(3).tolist(),
+                        "final_attached": bool(env.attached)})
+        print(f"ep {ep + 1}/{args.episodes} success={info['success']} steps={info['steps']} place_err={err * 100:.1f}cm closes={len(env.close_log)} "
+              f"close_err_xy={[round(float(np.hypot(c[0], c[1])) * 100, 1) for c in env.close_log]}cm wall={time.time() - t0:.0f}s", flush=True)
     if rec:
         rec.stop()
     ok = sum(r["success"] for r in results)

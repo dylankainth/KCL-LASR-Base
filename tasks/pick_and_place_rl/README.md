@@ -19,6 +19,9 @@ This is separate from `tasks/pick_and_place` (the RoboCup task, where a human do
 | Training (PyTorch, host) | `scripts/train_bc.py` |
 | Policy inference (numpy, container) | `policy.py` |
 | Evaluation + video | `evaluate.py`, `video.py` |
+| Camera perception (colour + depth), table height/edge | `perception.py`, `perception_node.py`, `table.py` |
+| Parking: base driver, planner, Gazebo test | `base.py`, `park.py`, `park_test.py` |
+| Real-robot runner, preflight, calibration, grip test, rehearsal | `run_real.py`, `preflight.py`, `calibrate.py`, `grip_test.py`, `rehearsal.py`, `REAL_ROBOT.md` |
 
 ## Task, observation, action
 
@@ -84,6 +87,32 @@ Perception alone (`perception_check`): object 0.55 cm, pad 0.16 cm mean error ov
 The extra DAgger round with noisy observations (`policy_noise_dagger.npz`) did **not** help, so `policy.npz` stays
 the default. The expert is no better than the policy under this noise, so the noise level, not the network, is
 what limits success; the numbers are within the spread expected from 30 episodes. Results files are in `results/`.
+
+### Why the policy is not better, and what limits success
+
+* **Not too few epochs: overfitting.** Training loss fell from 0.17 to 0.0045 while held-out loss rose from 0.18
+  (epoch 25) to 0.27 (epoch 375). `scripts/train_bc.py` now keeps the best held-out epoch (early stopping) and
+  supports dropout, weight decay and input noise. A retrained policy (dropout 0.1, weight decay 1e-3, best epoch 20)
+  scored 28/30 vs 29/30 for `policy.npz` and 28/30 for the expert on the same 30 noisy episodes (seed 901,
+  0.5 cm bias; `results/cmp_*.json`): no measurable gain, so `policy.npz` stays.
+* **Camera accuracy decides the outcome.** Scripted expert, 20 episodes per point, per-axis random camera bias
+  (`results/sweep/`):
+
+  | Bias (1 sigma) | 0.1 cm | 0.5 cm | 1.0 cm | 2.0 cm |
+  | :--- | :--- | :--- | :--- | :--- |
+  | Success | 20/20 | 20/20 | 15/20 | 9/20 |
+
+  The gripper opens ~9 cm for a 5 cm can, leaving ~1.5 cm per side; beyond that the finger knocks the can away. So
+  the real-robot plan is to measure and remove the camera offset by hand (`calibrate.py`), not to train longer.
+* Policies imitate the expert, so more demonstrations can make them more consistent but cannot beat the expert.
+
+### Parking (Gazebo)
+
+`park.py` squares the robot to the table edge (depth camera) and shifts it so the object and pad land in the trained
+region. From random displacements (+-12 cm, +-10 cm, +-8 deg): 8 of 10 trials ended inside the trained region
+(9 of 10 within 1 cm), final yaw within about 1.3 deg (`results/parking/`). Parking followed by the scripted expert's
+pick-and-place: see `REAL_ROBOT.md` section 8. The simulated base slips at low speed and its odometry over-reports
+rotation, so these tests use Gazebo's ground-truth odometry as a stand-in for the real robot's.
 
 The real-robot path is described in `REAL_ROBOT.md` (nothing here has run on the real TIAGo).
 

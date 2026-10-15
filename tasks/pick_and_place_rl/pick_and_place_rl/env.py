@@ -22,6 +22,7 @@ DT = 0.1  # control period (sim seconds)
 GRIP_CLOSE_CMD = 0.0245  # finger command: just under the object radius (0.025)
 GRIP_OPEN_CMD = 0.045
 CLOSED_ON_OBJ = 0.0262  # finger opening at/below which the object is gripped
+LOST_OPENING = 0.020  # real robot: opening below this while 'holding' means the object slipped out
 PLACE_TOL = 0.04  # success: object centre within this xy distance of the pad centre
 
 OBJ_REGION = ((0.58, 0.68), (0.05, 0.28))
@@ -89,6 +90,10 @@ class PickPlaceEnv:
         self.arm = arm
         self.max_steps = max_steps
         self.clean = None
+        self.grip_close_cmd = GRIP_CLOSE_CMD  # finger command when closing (tune on the real gripper)
+        self.no_close = False  # approach-only mode: the gripper is never allowed to close
+        self.lost_count = 0
+        self.close_log = []  # sim only: true (object - hand) error at each close command
         self.step_scale = step_scale  # < 1 slows the hand down (real robot first trials)
         self.obs_noise = obs_noise  # PerceptionNoise or None (sim: corrupts what the policy sees)
         self.rng = np.random.default_rng(seed)
@@ -97,12 +102,15 @@ class PickPlaceEnv:
         self.steps = 0
         self._arm_ready = False
         self.base_resets = 0
+        self.pin_base = True  # sim: teleport the base back to the origin if it drifts (off when the robot parks itself)
         self.sc.detach_object()  # drop any joint left over from a previous run
         self.sc.sleep(0.2)
 
     # ------------------------------------------------------------------ helpers
     def ensure_base(self, tol=0.01):
         """The kinematics assume the base frame == world frame; re-pin the base if it drifted."""
+        if not self.pin_base:
+            return
         b = self.sc.model_pos("tiago")
         if np.linalg.norm(b[:2]) > tol:
             print(f"WARNING: base drifted to {b.round(3)}; re-pinning at the origin", flush=True)
@@ -137,6 +145,7 @@ class PickPlaceEnv:
         sc, arm = self.sc, self.arm
         sc.detach_object()  # always (a joint may exist even if we think we are detached)
         self.attached = False
+        self.close_log = []
         sc.sleep(0.1)
         self.ensure_base()
         self.grip_cmd = False
@@ -203,10 +212,13 @@ class PickPlaceEnv:
             n = np.linalg.norm(lead)
             if n > 0.04:
                 target = arm.hand_pos() + lead * (0.04 / n)
-        want_close = bool(action[3] > 0.5)
+        want_close = bool(action[3] > 0.5) and not self.no_close
+        if want_close and not self.grip_cmd and sc.sim:  # log how well aligned the grasp really is
+            rel = sc.truth_pos(OBJECT_NAME) - arm.hand_pos()
+            self.close_log.append([float(rel[0]), float(rel[1]), float(rel[2] + GRASP_DZ)])
         if want_close != self.grip_cmd:
             self.grip_cmd = want_close
-            sc.send_gripper(GRIP_CLOSE_CMD if want_close else GRIP_OPEN_CMD, 1.0)
+            sc.send_gripper(self.grip_close_cmd if want_close else GRIP_OPEN_CMD, 1.0)
         arm.servo(target, DT)
         self.ensure_base()
 
@@ -220,6 +232,15 @@ class PickPlaceEnv:
         elif (not self.grip_cmd) and self.attached:
             sc.detach_object()
             self.attached = False
+        if (not sc.sim) and self.attached and sc.gripper_opening() < LOST_OPENING:
+            # real robot: the fingers closed further than the object is wide, so it slipped out
+            print("WARNING: object lost from the gripper; reopening and re-perceiving", flush=True)
+            sc.detach_object()
+            self.attached = False
+            self.grip_cmd = False
+            sc.send_gripper(GRIP_OPEN_CMD, 0.6)
+            sc.unlatch_object()
+            self.lost_count += 1
 
         self.steps += 1
         pt = sc.truth_pos(PAD_NAME) if sc.sim else sc.model_pos(PAD_NAME)

@@ -1,0 +1,106 @@
+[
+ {
+  "trial": 0,
+  "start": [
+   0.026,
+   -0.025,
+   0.084
+  ],
+  "end": [
+   0.022,
+   -0.025,
+   0.021
+  ],
+  "yaw_end_deg": 1.19,
+  "ok": true,
+  "iterations": 1,
+  "msg": "parked",
+  "in_region": true,
+  "obj_base": [
+   0.656,
+   0.179
+  ],
+  "pad_base": [
+   0.651,
+   -0.252
+  ]
+ },
+ {
+  "trial": 1,
+  "start": [
+   -0.005,
+   -0.014,
+   0.081
+  ],
+  "end": [
+   -0.025,
+   0.022,
+   0.021
+  ],
+  "yaw_end_deg": 1.2,
+  "ok": true,
+  "iterations": 3,
+  "msg": "parked",
+  "in_region": true,
+  "obj_base": [
+   0.627,
+   0.215
+  ],
+  "pad_base": [
+   0.657,
+   -0.136
+  ]
+ },
+ {
+  "trial": 2,
+  "start": [
+   -0.077,
+   0.022,
+   0.057
+  ],
+  "end": [
+   0.034,
+   0.022,
+   0.02
+  ],
+  "yaw_end_deg": 1.17,
+  "ok": true,
+  "iterations": 2,
+  "msg": "parked",
+  "in_region": true,
+  "obj_base": [
+   0.646,
+   0.1
+  ],
+  "pad_base": [
+   0.64,
+   -0.129
+  ]
+ },
+ {
+  "trial": 3,
+  "start": [
+   -0.002,
+   0.0,
+   0.128
+  ],
+  "end": [
+   -0.008,
+   -0.001,
+   0.02
+  ],
+  "yaw_end_deg": 1.12,
+  "ok": true,
+  "iterations": 1,
+  "msg": "parked",
+  "in_region": false,
+  "obj_base": [
+   0.686,
+   0.19
+  ],
+  "pad_base": [
+   0.598,
+   -0.192
+  ]
+ }
+]

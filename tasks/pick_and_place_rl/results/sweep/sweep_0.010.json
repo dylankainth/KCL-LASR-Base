@@ -1,0 +1,436 @@
+{
+ "policy": null,
+ "successes": 15,
+ "episodes": 20,
+ "results": [
+  {
+   "episode": 0,
+   "success": false,
+   "steps": 250,
+   "place_error_m": 0.5307750934311676,
+   "closes": [],
+   "final_obj_minus_hand": [
+    -0.006,
+    -0.053,
+    -0.214
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 1,
+   "success": true,
+   "steps": 101,
+   "place_error_m": 0.008542311003729564,
+   "closes": [
+    [
+     -0.0037,
+     -0.0104,
+     -0.0063
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.003,
+    -0.003,
+    -0.165
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 2,
+   "success": true,
+   "steps": 99,
+   "place_error_m": 0.005678466218333386,
+   "closes": [
+    [
+     0.0046,
+     0.0035,
+     -0.0006
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.008,
+    -0.003,
+    -0.165
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 3,
+   "success": true,
+   "steps": 143,
+   "place_error_m": 0.010464276896111156,
+   "closes": [
+    [
+     -0.0111,
+     0.0023,
+     0.0051
+    ],
+    [
+     -0.0068,
+     -0.0057,
+     0.0044
+    ],
+    [
+     -0.0067,
+     -0.0046,
+     -0.0019
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.002,
+    -0.008,
+    -0.161
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 4,
+   "success": true,
+   "steps": 76,
+   "place_error_m": 0.016979616658948666,
+   "closes": [
+    [
+     -0.0053,
+     0.0024,
+     -0.0258
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.002,
+    0.0,
+    -0.157
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 5,
+   "success": true,
+   "steps": 116,
+   "place_error_m": 0.020014959946400186,
+   "closes": [
+    [
+     0.0041,
+     0.0143,
+     0.0057
+    ],
+    [
+     0.0093,
+     -0.0004,
+     0.0096
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.012,
+    0.004,
+    -0.157
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 6,
+   "success": true,
+   "steps": 131,
+   "place_error_m": 0.017428762010616907,
+   "closes": [
+    [
+     0.0067,
+     -0.0039,
+     -0.0007
+    ],
+    [
+     -0.0049,
+     -0.0002,
+     0.0096
+    ],
+    [
+     0.0057,
+     -0.0029,
+     0.0049
+    ],
+    [
+     0.0117,
+     -0.0088,
+     0.0073
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.007,
+    -0.004,
+    -0.16
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 7,
+   "success": false,
+   "steps": 95,
+   "place_error_m": 0.6723507236645754,
+   "closes": [
+    [
+     0.0013,
+     0.0151,
+     -0.002
+    ],
+    [
+     0.0082,
+     0.0096,
+     0.0033
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.134,
+    0.094,
+    -0.255
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 8,
+   "success": true,
+   "steps": 91,
+   "place_error_m": 0.027839386872420484,
+   "closes": [
+    [
+     -0.0102,
+     -0.0217,
+     -0.0007
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.009,
+    -0.006,
+    -0.163
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 9,
+   "success": true,
+   "steps": 106,
+   "place_error_m": 0.019280673690053002,
+   "closes": [
+    [
+     -0.0121,
+     -0.0202,
+     0.0012
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.014,
+    -0.016,
+    -0.162
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 10,
+   "success": true,
+   "steps": 157,
+   "place_error_m": 0.023227377312430502,
+   "closes": [
+    [
+     0.0124,
+     0.0056,
+     -0.0052
+    ],
+    [
+     0.0144,
+     0.0019,
+     0.0036
+    ],
+    [
+     0.0105,
+     0.0059,
+     -0.0067
+    ],
+    [
+     0.0054,
+     0.0067,
+     -0.0029
+    ],
+    [
+     0.0125,
+     0.0076,
+     -0.001
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.005,
+    -0.004,
+    -0.167
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 11,
+   "success": true,
+   "steps": 123,
+   "place_error_m": 0.019269551909031356,
+   "closes": [
+    [
+     0.0125,
+     -0.0008,
+     -0.0087
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.0,
+    -0.011,
+    -0.156
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 12,
+   "success": false,
+   "steps": 111,
+   "place_error_m": 0.3403383327651185,
+   "closes": [
+    [
+     0.0146,
+     0.0006,
+     -0.0141
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.134,
+    -0.105,
+    -0.257
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 13,
+   "success": false,
+   "steps": 90,
+   "place_error_m": 0.10492546446241867,
+   "closes": [
+    [
+     0.0035,
+     0.0098,
+     -0.0071
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.092,
+    -0.052,
+    -0.157
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 14,
+   "success": true,
+   "steps": 132,
+   "place_error_m": 0.010478164256613264,
+   "closes": [
+    [
+     -0.0043,
+     -0.0091,
+     0.006
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.003,
+    -0.004,
+    -0.167
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 15,
+   "success": true,
+   "steps": 88,
+   "place_error_m": 0.014564923287094593,
+   "closes": [
+    [
+     0.0152,
+     0.0097,
+     0.0066
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.005,
+    -0.004,
+    -0.158
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 16,
+   "success": false,
+   "steps": 250,
+   "place_error_m": 0.09055063057703365,
+   "closes": [
+    [
+     -0.014,
+     0.0143,
+     0.006
+    ]
+   ],
+   "final_obj_minus_hand": [
+    -0.0,
+    -0.001,
+    -0.055
+   ],
+   "final_attached": true
+  },
+  {
+   "episode": 17,
+   "success": true,
+   "steps": 100,
+   "place_error_m": 0.026144606197112355,
+   "closes": [
+    [
+     0.0036,
+     -0.0067,
+     0.0001
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.008,
+    -0.004,
+    -0.161
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 18,
+   "success": true,
+   "steps": 116,
+   "place_error_m": 0.01185344317874632,
+   "closes": [
+    [
+     0.0125,
+     0.0023,
+     0.0014
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.006,
+    -0.006,
+    -0.164
+   ],
+   "final_attached": false
+  },
+  {
+   "episode": 19,
+   "success": true,
+   "steps": 98,
+   "place_error_m": 0.010721975923288872,
+   "closes": [
+    [
+     0.0006,
+     0.0185,
+     -0.0031
+    ]
+   ],
+   "final_obj_minus_hand": [
+    0.004,
+    0.005,
+    -0.157
+   ],
+   "final_attached": false
+  }
+ ]
+}

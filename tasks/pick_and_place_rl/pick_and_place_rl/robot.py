@@ -7,12 +7,14 @@ import numpy as np
 import rclpy
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import GetEntityState, SetEntityState
+from control_msgs.action import FollowJointTrajectory
+from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import JointState
-from std_msgs.msg import String
+from std_msgs.msg import Float64MultiArray, String
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
@@ -43,6 +45,45 @@ def _duration(seconds: float) -> Duration:
     return Duration(sec=sec, nanosec=int((seconds - sec) * 1e9))
 
 
+class _TrajectoryOut:
+    """Sends single-point trajectories to a PAL controller.
+
+    Primary path: the `/<name>_controller/follow_joint_trajectory` action (the interface the rest of this repo
+    uses on the real robot). A new goal replaces the previous one, so streaming small servo goals works.
+    Fallback: the `/<name>_controller/joint_trajectory` topic, used when no action server answers."""
+
+    def __init__(self, node, name, use_action=True, wait=3.0):
+        self.name = name
+        self.goals_sent = 0
+        self.rejected = 0
+        self.action = None
+        if use_action:
+            client = ActionClient(node, FollowJointTrajectory, f"/{name}_controller/follow_joint_trajectory")
+            if client.wait_for_server(timeout_sec=wait):
+                self.action = client
+        self.pub = None if self.action else node.create_publisher(JointTrajectory, f"/{name}_controller/joint_trajectory", 10)
+
+    @property
+    def mode(self):
+        return "action" if self.action else "topic"
+
+    def _on_response(self, fut):
+        try:
+            if not fut.result().accepted:
+                self.rejected += 1
+        except Exception:
+            self.rejected += 1
+
+    def send(self, msg: JointTrajectory):
+        self.goals_sent += 1
+        if self.action:
+            goal = FollowJointTrajectory.Goal()
+            goal.trajectory = msg
+            self.action.send_goal_async(goal).add_done_callback(self._on_response)
+        else:
+            self.pub.publish(msg)
+
+
 class TiagoScene:
     """Joint state, arm/torso/gripper commands and ground-truth object poses."""
 
@@ -54,6 +95,7 @@ class TiagoScene:
         use_perception: bool = False,
         speed_scale: float = 1.0,
         max_joint_speed: float = 0.8,
+        use_actions: bool = True,
     ):
         """sim=True: Gazebo (ground-truth poses, teleporting, grasp assist).
         sim=False: the real robot (poses from the perception node, no teleporting, no grasp assist,
@@ -63,6 +105,7 @@ class TiagoScene:
         self._perc = {}
         self._est_time = {}
         self.z_offset = 0.0  # real robot: table height minus 0.815 (set by the runner)
+        self.calib = np.zeros(3)  # added to every camera estimate (base frame), from calibrate.py
         self.carrying = False  # real robot: the env set this when the fingers closed on the object
         self.max_joint_speed = max_joint_speed * speed_scale
         if not rclpy.ok():
@@ -77,6 +120,7 @@ class TiagoScene:
         self._lock = threading.Lock()
         self._joints = {}
         self._models = {}
+        self._yaws = {}
         self.node.create_subscription(JointState, "/joint_states", self._on_joints, 10)
         if sim:
             self.node.create_subscription(
@@ -89,18 +133,14 @@ class TiagoScene:
             self.node.create_subscription(
                 PointStamped, "/pick_place/pad", lambda m: self._on_point(PAD_NAME, m), 5
             )
-        self._arm_pub = self.node.create_publisher(
-            JointTrajectory, "/arm_controller/joint_trajectory", 10
-        )
-        self._torso_pub = self.node.create_publisher(
-            JointTrajectory, "/torso_controller/joint_trajectory", 10
-        )
-        self._grip_pub = self.node.create_publisher(
-            JointTrajectory, "/gripper_controller/joint_trajectory", 10
-        )
-        self._head_pub = self.node.create_publisher(
-            JointTrajectory, "/head_controller/joint_trajectory", 10
-        )
+            self.node.create_subscription(Float64MultiArray, "/pick_place/table", self._on_table, 5)
+        self._table = None
+        self._table_time = 0.0
+        self._arm_pub = _TrajectoryOut(self.node, "arm", use_actions)
+        self._torso_pub = _TrajectoryOut(self.node, "torso", use_actions)
+        self._grip_pub = _TrajectoryOut(self.node, "gripper", use_actions)
+        self._head_pub = _TrajectoryOut(self.node, "head", use_actions)
+        self.command_modes = {o.name: o.mode for o in (self._arm_pub, self._torso_pub, self._grip_pub, self._head_pub)}
         self._attach_pub = self.node.create_publisher(String, "/grasp_attach/command", 10)
         if sim:
             self._set_state = self.node.create_client(
@@ -116,6 +156,7 @@ class TiagoScene:
         self._spin_thread.start()
 
         self.wait_ready()
+        print(f"[robot] command interfaces: {self.command_modes}", flush=True)
 
     # ------------------------------------------------------------------ state
     _last_joint_wall = 0.0
@@ -131,6 +172,41 @@ class TiagoScene:
                 self._models[name] = np.array(
                     [pose.position.x, pose.position.y, pose.position.z]
                 )
+                q = pose.orientation
+                self._yaws[name] = float(np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)))
+
+    def _on_table(self, msg: Float64MultiArray):
+        with self._lock:
+            self._table = np.array(msg.data, float)
+            self._table_time = time.time()
+
+    def table_fit(self, max_age: float = 1.0):
+        """Latest table height / edge fit from the perception node (TableFit) or None if stale."""
+        from pick_and_place_rl.table import TableFit
+
+        with self._lock:
+            if self._table is None or time.time() - self._table_time > max_age:
+                return None
+            return TableFit.from_array(self._table)
+
+    def joints_still(self, names, window=0.6, tol=0.002) -> bool:
+        """True if none of the named joints moved more than tol (rad/m) over `window` seconds."""
+        with self._lock:
+            a = np.array([self._joints[n] for n in names])
+        self.sleep(window)
+        with self._lock:
+            b = np.array([self._joints[n] for n in names])
+        return bool(np.max(np.abs(b - a)) < tol)
+
+    def clear_table(self):
+        with self._lock:
+            self._table = None
+
+    def truth_pose2d(self, name: str):
+        """Gazebo ground truth (simulation only): (x, y, yaw) in the world frame."""
+        with self._lock:
+            p = self._models[name]
+            return float(p[0]), float(p[1]), self._yaws[name]
 
     def _on_point(self, name, msg: PointStamped):
         """Real robot: a perception estimate (base frame). Latched while the hand occludes the object."""
@@ -226,7 +302,7 @@ class TiagoScene:
             if name == OBJECT_NAME and self.carrying:
                 return self.ee_pos() + np.array([0.0, 0.0, -GRASP_DZ - self.z_offset])
             with self._lock:
-                p = self._perc[name].copy()
+                p = self._perc[name].copy() + self.calib
             p[2] -= self.z_offset
             return p
         return self.truth_pos(name)
@@ -239,7 +315,7 @@ class TiagoScene:
         pt.positions = [float(p) for p in positions]
         pt.time_from_start = _duration(duration)
         msg.points = [pt]
-        pub.publish(msg)
+        pub.send(msg)
 
     def _limited_duration(self, names, target, duration, max_jump=MAX_JUMP):
         """Real robot: stretch the duration so no joint exceeds the speed limit; refuse jumps."""

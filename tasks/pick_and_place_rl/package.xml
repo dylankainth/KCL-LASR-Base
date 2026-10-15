@@ -10,6 +10,7 @@
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
   <depend>trajectory_msgs</depend>
+  <depend>control_msgs</depend>
   <depend>gazebo_msgs</depend>
   <depend>simulation</depend>
 

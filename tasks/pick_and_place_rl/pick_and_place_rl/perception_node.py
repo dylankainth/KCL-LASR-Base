@@ -17,9 +17,11 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from sensor_msgs.msg import CameraInfo, Image
+from std_msgs.msg import Float64MultiArray
 from tf2_ros import Buffer, TransformListener
 
 from pick_and_place_rl import perception as P
+from pick_and_place_rl.table import fit_table, points_from_depth
 
 BASE_FRAME = "base_footprint"
 
@@ -67,6 +69,10 @@ class PerceptionNode(Node):
             "object": self.create_publisher(PointStamped, "/pick_place/object", 10),
             "pad": self.create_publisher(PointStamped, "/pick_place/pad", 10),
         }
+        self.table_pub = self.create_publisher(Float64MultiArray, "/pick_place/table", 10)
+        self.table_hist = collections.deque(maxlen=5)
+        self.table_every = getattr(args, "table_every", 4)
+        self.table_reason = "no frame yet"
         self.create_subscription(CameraInfo, args.info, self._on_info, 1)
         self.create_subscription(Image, args.rgb, self._on_rgb, 1)
         self.create_subscription(Image, args.depth, self._on_depth, 1)
@@ -74,6 +80,18 @@ class PerceptionNode(Node):
         self.every = args.every
         self._n = 0
         self.frame = args.camera_frame
+
+    def _publish_table(self, depth, T):
+        fit, why = fit_table(points_from_depth(depth, self.K, T))
+        self.table_reason = why
+        if fit is None:
+            self.get_logger().warn(f"table: {why}", throttle_duration_sec=5.0)
+            self.table_hist.clear()  # a failed view invalidates the running median
+            return
+        self.table_hist.append(fit.as_array())
+        out = Float64MultiArray()
+        out.data = [float(v) for v in np.median(np.array(self.table_hist), axis=0)]
+        self.table_pub.publish(out)
 
     def _on_info(self, msg):
         self.K = np.array(msg.k).reshape(3, 3)
@@ -98,8 +116,11 @@ class PerceptionNode(Node):
         if depth.shape != self.rgb.shape[:2]:
             self.get_logger().warn("rgb and depth sizes differ (use registered depth)", throttle_duration_sec=5.0)
             return
-        obj, pad = P.detect(self.rgb, depth, self.K, transform_to_matrix(tf))
+        T = transform_to_matrix(tf)
+        obj, pad = P.detect(self.rgb, depth, self.K, T)
         self.stats["frames"] += 1
+        if self.stats["frames"] % self.table_every == 0:
+            self._publish_table(depth, T)
         for name, est in (("object", obj), ("pad", pad)):
             if est is None:
                 continue
@@ -122,6 +143,7 @@ def main():
     ap.add_argument("--camera-frame", default="", help="optical frame (default: from camera_info)")
     ap.add_argument("--window", type=int, default=5)
     ap.add_argument("--every", type=int, default=2, help="process every n-th depth frame")
+    ap.add_argument("--table-every", type=int, default=4, help="fit the table every n-th processed frame")
     args, _ = ap.parse_known_args()
     rclpy.init()
     node = PerceptionNode(args)

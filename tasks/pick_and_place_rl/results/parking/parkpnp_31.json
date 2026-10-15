@@ -1,0 +1,31 @@
+[
+ {
+  "trial": 0,
+  "start": [
+   0.043,
+   -0.092,
+   -0.125
+  ],
+  "end": [
+   0.016,
+   -0.056,
+   -0.008
+  ],
+  "yaw_end_deg": -0.48,
+  "ok": true,
+  "iterations": 4,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.653,
+   0.127
+  ],
+  "pad_base": [
+   0.632,
+   -0.125
+  ],
+  "pnp_success": false,
+  "pnp_steps": 113
+ }
+]

@@ -1,0 +1,164 @@
+[
+ {
+  "trial": 0,
+  "start": [
+   0.031,
+   0.096,
+   -0.021
+  ],
+  "end": [
+   -0.006,
+   0.032,
+   -0.022
+  ],
+  "yaw_end_deg": -1.26,
+  "ok": false,
+  "iterations": 1,
+  "msg": "base motion aborted: turn of -1.09 rad exceeds the remaining turn budget 0.36",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.66,
+   0.172
+  ],
+  "pad_base": [
+   0.663,
+   -0.28
+  ]
+ },
+ {
+  "trial": 1,
+  "start": [
+   0.041,
+   0.099,
+   -0.081
+  ],
+  "end": [
+   -0.022,
+   0.019,
+   0.0
+  ],
+  "yaw_end_deg": 0.0,
+  "ok": true,
+  "iterations": 3,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.614,
+   0.251
+  ],
+  "pad_base": [
+   0.67,
+   -0.26
+  ]
+ },
+ {
+  "trial": 2,
+  "start": [
+   0.109,
+   -0.032,
+   -0.016
+  ],
+  "end": [
+   0.009,
+   -0.032,
+   -0.015
+  ],
+  "yaw_end_deg": -0.84,
+  "ok": true,
+  "iterations": 1,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.653,
+   0.252
+  ],
+  "pad_base": [
+   0.596,
+   -0.203
+  ]
+ },
+ {
+  "trial": 3,
+  "start": [
+   -0.007,
+   0.052,
+   0.03
+  ],
+  "end": [
+   -0.029,
+   -0.071,
+   0.02
+  ],
+  "yaw_end_deg": 1.13,
+  "ok": true,
+  "iterations": 4,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.679,
+   0.208
+  ],
+  "pad_base": [
+   0.606,
+   -0.169
+  ]
+ },
+ {
+  "trial": 4,
+  "start": [
+   0.054,
+   -0.001,
+   0.015
+  ],
+  "end": [
+   0.016,
+   -0.001,
+   0.015
+  ],
+  "yaw_end_deg": 0.84,
+  "ok": true,
+  "iterations": 1,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.609,
+   0.086
+  ],
+  "pad_base": [
+   0.639,
+   -0.251
+  ]
+ },
+ {
+  "trial": 5,
+  "start": [
+   -0.054,
+   -0.097,
+   -0.086
+  ],
+  "end": [
+   -0.035,
+   -0.029,
+   -0.011
+  ],
+  "yaw_end_deg": -0.63,
+  "ok": true,
+  "iterations": 3,
+  "msg": "parked",
+  "in_region": true,
+  "near_region": true,
+  "obj_base": [
+   0.652,
+   0.133
+  ],
+  "pad_base": [
+   0.633,
+   -0.116
+  ]
+ }
+]

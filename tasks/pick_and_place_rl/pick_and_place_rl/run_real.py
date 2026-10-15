@@ -36,6 +36,27 @@ def ask(prompt, default_no=True):
     return ans in ("y", "yes") if default_no else ans not in ("n", "no")
 
 
+def park_step(sc, args, urdf):
+    """Survey the table, object and pad; drive the base into the trained region unless --no-park."""
+    from pick_and_place_rl.base import BaseDriver
+    from pick_and_place_rl.park import auto_park
+
+    base = None if args.no_park else BaseDriver(sc, odom=args.odom)
+    if base is None:
+        class _Still:  # --no-park: report only, the plan is printed but never executed
+            travel_left = 0.0
+
+            def stop(self):
+                pass
+        base = _Still()
+    res = auto_park(sc, base, confirm=lambda t: ask(t), dry_run=args.no_park, need_table=not args.no_park)
+    if args.no_park and res.ok and res.msg.startswith("dry run:"):
+        from pick_and_place_rl.park import ParkResult
+
+        return ParkResult(False, f"not in the trained region ({res.msg[9:]}); move the robot by hand or drop --no-park", res.iterations, res.history)
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--urdf", default=None, help="URDF file (default: robot_description from the robot)")
@@ -48,6 +69,13 @@ def main():
     ap.add_argument("--max-steps", type=int, default=400)
     ap.add_argument("--report", default="real_run.json")
     ap.add_argument("--auto", action="store_true", help="do not prompt between steps of an episode")
+    ap.add_argument("--approach-only", action="store_true",
+                    help="never close the gripper: stop above the object at grasp height so a person can check alignment")
+    ap.add_argument("--grip-close", type=float, default=None,
+                    help="finger command when closing (m per finger); find it with grip_test.py")
+    ap.add_argument("--no-park", action="store_true", help="do not drive the base: only report where the objects are relative to the trained region")
+    ap.add_argument("--odom", default=None, help="odometry topic for parking (default: /mobile_base_controller/odom or /odom)")
+    ap.add_argument("--calib", default=None, help="calibration json from calibrate.py (xy/z offset of the camera estimates)")
     args = ap.parse_args()
     if not args.expert and not args.policy:
         sys.exit("give --policy FILE or --expert")
@@ -65,8 +93,14 @@ def main():
             sys.exit("no robot_description from robot_state_publisher; pass --urdf")
     sc = TiagoScene(urdf, node_name="pick_place_real", sim=False, speed_scale=args.speed_scale)
     sc.z_offset = args.table_height - SIM_TABLE_TOP
+    if args.calib:
+        sc.calib = np.array(json.load(open(args.calib))["offset"], float)
+        print(f"camera calibration offset (m): {sc.calib.round(4)}")
     arm = ArmController(sc, z_offset=sc.z_offset)
     env = PickPlaceEnv(sc, arm, max_steps=args.max_steps, step_scale=args.step_scale)
+    env.no_close = args.approach_only
+    if args.grip_close is not None:
+        env.grip_close_cmd = args.grip_close
     policy = None if args.expert else MLPPolicy.load(args.policy)
 
     print(
@@ -77,6 +111,8 @@ def main():
     )
     if not ask("Start?"):
         return
+    if not ask("Is the arm in its tucked (home) pose, torso down? (the route assumes it)"):
+        sys.exit("Move the arm to the tucked pose first (PAL play_motion 'home'), then run again.")
 
     pan, tilt, err, cam = solve_head(urdf, TORSO_HEIGHT, (0.63, 0.0, args.table_height + 0.03))
     print(f"aiming head: pan {pan:.2f}, tilt {tilt:.2f}")
@@ -87,6 +123,13 @@ def main():
     input("Press Enter when they are placed... ")
     if not sc.wait_perception(timeout=20):
         sys.exit("perception does not see both the object and the pad (is perception_node running?)")
+    park_report = None
+    try:
+        park_report = park_step(sc, args, urdf)
+    except Exception as e:
+        sys.exit(f"parking failed: {e}")
+    if park_report is not None and not park_report.ok:
+        sys.exit(f"PARK FAILED: {park_report.msg}. Fix the placement or robot position and run again.")
     o, p = sc.model_pos("pick_object"), sc.model_pos("place_pad")
     print(f"perceived (virtual frame): object {o.round(3)}, pad {p.round(3)}")
     if not ask("Do these look right?"):
@@ -105,6 +148,10 @@ def main():
             for t in range(env.max_steps):
                 act = expert_action(obs) if args.expert else policy.act(obs)
                 obs, done, info = env.step(act)
+                if args.approach_only and np.linalg.norm(obs[3:5]) < 0.012 and abs(obs[5] + 0.06) < 0.008:
+                    print(f"  hand is above the object at grasp height: object-hand = {obs[3:6].round(3)}")
+                    print("  Check by eye that the open fingers straddle the object (it should be centred).")
+                    break
                 if t % 20 == 0:
                     print(f"  step {t}: hand {obs[0:3].round(3)} grip {obs[10]:.0f} attached {obs[11]:.0f}", flush=True)
                 if done:
