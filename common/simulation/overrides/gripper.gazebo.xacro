@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  LASR override of pal_gripper_description/urdf/gripper.gazebo.xacro.
+
+  The stock file sets minDepth=0.1 (10 cm) and maxVel=1.0 on the fingers, which means
+  ODE applies no contact-recovery force until a finger has penetrated 10 cm. Small
+  objects can then never be squeezed, and are ejected when forced contact does occur.
+  This version uses a small minDepth, a low correction velocity and higher friction so
+  a simulated parallel-jaw grasp holds a small object.
+
+  Bind-mounted over the original inside the container (see
+  common/simulation/README.md and WSL_APPTAINER_SETUP.md).
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="finger_gazebo" params="name">
+    <gazebo reference="${name}_link">
+      <kp>100000.0</kp>
+      <kd>10.0</kd>
+      <mu1>2.0</mu1>
+      <mu2>2.0</mu2>
+      <fdir1>0 0 0</fdir1>
+      <maxVel>0.05</maxVel>
+      <minDepth>0.0002</minDepth>
+      <material>Gazebo/Black</material>
+    </gazebo>
+    <gazebo reference="${name}_joint">
+      <implicitSpringDamper>1</implicitSpringDamper>
+      <provideFeedback>1</provideFeedback>
+    </gazebo>
+  </xacro:macro>
+
+</robot>

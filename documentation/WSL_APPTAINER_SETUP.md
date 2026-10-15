@@ -2,7 +2,7 @@
 
 This guide gets the TIAGo simulation (Gazebo, ROS 2 Humble) running from this repo on a Windows PC with an NVIDIA GPU, using WSL2 and Apptainer.
 
-> **Status:** written from reading the repo (`README.md`, `ros2.def`, `common/simulation`). It has **not been tested end to end**. Steps marked ⚠️ are the likely trouble spots. If a step fails, note the exact error and fix this document afterwards.
+> **Status:** the sections marked ✅ were verified on Windows 11 + WSL2 (Ubuntu 24.04) + RTX 3060 12 GB, Apptainer 1.5.3. Sim launch was verified by node/topic listing (Gazebo server+client, controllers, sensors, MoveIt); the Gazebo window was not visually checked. Steps marked ⚠️ are the likely trouble spots.
 
 ---
 
@@ -225,3 +225,28 @@ Rules:
 - Whenever you find that the guide is wrong or incomplete, update documentation/WSL_APPTAINER_SETUP.md with the verified fix.
 - Report what is verified working vs. assumed.
 ```
+
+---
+
+## 11. Verified notes (✅ tested)
+
+**Disk:** the WSL virtual disk lives on `C:`. When `C:` filled up (< 1 MB free) WSL returned `Input/output error` on `/usr/bin/*` and builds were truncated. Keep 30+ GB free on `C:`, or move the distro: `wsl --manage Ubuntu --move F:\WSL`.
+
+**Memory:** with 16 GB for WSL and heavy Windows apps open, builds were killed for low memory. Setting `memory=20GB` / `swap=16GB` in `.wslconfig` and closing browsers/Docker Desktop fixed it. Use `colcon build --parallel-workers 1` and `MAKEFLAGS=-j2`.
+
+**No `tiago_humble_os.sif`?** PAL does not publish one. A working stand-in: `Bootstrap: docker` / `From: osrf/ros:humble-desktop-full`, then `vcs import` `tiago_public.repos` (from `pal-robotics/tiago_tutorials`, `humble-devel`) into `/opt/tiago_public_ws`, `rosdep install`, `colcon build`, and write `/opt/env.sh` (sources ROS + that workspace) and an empty `/opt/pal/alum/setup.bash`, which `ros2.def` sources. Build it as `tiago_humble_os.sif`, then build `ros2.sif` as in step 4. Private PAL packages are not included.
+
+**GPU + GL in the container** (replaces the guesses in step 5). `--nv` works, but `LD_LIBRARY_PATH` must go through `APPTAINERENV_` and Mesa must use D3D12, otherwise `nvidia-smi` fails ("GPU access blocked") and GL falls back to `llvmpipe`:
+
+```bash
+export APPTAINERENV_LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/local/lib:/lib/x86_64-linux-gnu
+export APPTAINERENV_GALLIUM_DRIVER=d3d12
+export APPTAINERENV_MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA
+apptainer run --nv -B /usr/lib/wsl -B /tmp/.X11-unix -B /mnt/wslg -B /run/user/$UID ros2.sif
+```
+
+Verified inside: `nvidia-smi -L` lists the GPU and `glxinfo -B` reports `D3D12 (NVIDIA GeForce RTX 3060)`. `--nvccli` does not work (no `nvidia-container-cli`).
+
+**Workspace + sim:** inside the container, `source /opt/env.sh`, bind the workspace, `colcon build --packages-up-to simulation`, then `ros2 launch simulation sim.launch.py`. Expect harmless early errors while controllers start. `moveit` logs `chomp_interface/CHOMPPlanner does not exist` (the CHOMP planner package is missing from the image).
+
+**Not verified:** `robot_ui` npm build (the image step fails because `robot_ui` is not in the image workspace), Ollama (skipped), YOLO/VLM/Whisper, and the task packages.

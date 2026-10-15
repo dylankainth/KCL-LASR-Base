@@ -1,8 +1,9 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
@@ -24,15 +25,20 @@ def generate_launch_description():
         launch_arguments={
             "navigation": "False",
             "is_public_sim": "True",
-            "world_name": "house",
-            "moveit": "True",
+            "world_name": LaunchConfiguration("world_name"),
+            "gzclient": LaunchConfiguration("gzclient"),
+            "moveit": LaunchConfiguration("moveit"),
             "rviz": "False",
-            "tuck_arm": "True",
+            "tuck_arm": LaunchConfiguration("tuck_arm"),
         }.items(),
     )
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument("world_name", default_value="house"),
+            DeclareLaunchArgument("gzclient", default_value="True"),
+            DeclareLaunchArgument("moveit", default_value="True"),
+            DeclareLaunchArgument("tuck_arm", default_value="True"),
             tiago_launch,
         ]
     )
