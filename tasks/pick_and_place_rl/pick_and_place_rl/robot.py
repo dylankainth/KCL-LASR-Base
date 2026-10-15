@@ -10,6 +10,7 @@ from gazebo_msgs.srv import GetEntityState, SetEntityState
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -23,6 +24,10 @@ FINGER_JOINTS = ["gripper_right_finger_joint", "gripper_left_finger_joint"]
 CHAIN_JOINTS = [TORSO_JOINT] + ARM_JOINTS
 OBJECT_NAME = "pick_object"
 PAD_NAME = "place_pad"
+OCCLUSION_RADIUS = 0.10  # real robot: hand within this xy distance of the object -> latch the estimate
+OCCLUSION_HEIGHT = 1.02  # ... and below this hand height
+MAX_JUMP = 1.2  # rad, refuse any joint command further than this from the measured state
+GRASP_DZ = 0.06  # hand height above the object's centre when grasping (same as env.GRASP_DZ)
 GRIPPER_OPEN = 0.045
 GRIPPER_CLOSED = 0.0
 
@@ -40,12 +45,30 @@ def _duration(seconds: float) -> Duration:
 class TiagoScene:
     """Joint state, arm/torso/gripper commands and ground-truth object poses."""
 
-    def __init__(self, urdf_xml: str, node_name: str = "pick_place_rl"):
+    def __init__(
+        self,
+        urdf_xml: str,
+        node_name: str = "pick_place_rl",
+        sim: bool = True,
+        use_perception: bool = False,
+        speed_scale: float = 1.0,
+        max_joint_speed: float = 0.8,
+    ):
+        """sim=True: Gazebo (ground-truth poses, teleporting, grasp assist).
+        sim=False: the real robot (poses from the perception node, no teleporting, no grasp assist,
+        joint speed limits enforced on every command)."""
+        self.sim = sim
+        self.use_perception = use_perception or not sim  # object/pad poses from the camera pipeline
+        self._perc = {}
+        self._est_time = {}
+        self.z_offset = 0.0  # real robot: table height minus 0.815 (set by the runner)
+        self.carrying = False  # real robot: the env set this when the fingers closed on the object
+        self.max_joint_speed = max_joint_speed * speed_scale
         if not rclpy.ok():
             rclpy.init()
         self.node = Node(
             node_name,
-            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)],
+            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, sim)],
         )
         self.chain = Chain(urdf_xml, "base_footprint", "gripper_grasping_frame")
         assert self.chain.joint_names == CHAIN_JOINTS, self.chain.joint_names
@@ -54,9 +77,17 @@ class TiagoScene:
         self._joints = {}
         self._models = {}
         self.node.create_subscription(JointState, "/joint_states", self._on_joints, 10)
-        self.node.create_subscription(
-            ModelStates, "/gazebo/model_states", self._on_models, 10
-        )
+        if sim:
+            self.node.create_subscription(
+                ModelStates, "/gazebo/model_states", self._on_models, 10
+            )
+        if self.use_perception:
+            self.node.create_subscription(
+                PointStamped, "/pick_place/object", lambda m: self._on_point(OBJECT_NAME, m), 5
+            )
+            self.node.create_subscription(
+                PointStamped, "/pick_place/pad", lambda m: self._on_point(PAD_NAME, m), 5
+            )
         self._arm_pub = self.node.create_publisher(
             JointTrajectory, "/arm_controller/joint_trajectory", 10
         )
@@ -66,13 +97,17 @@ class TiagoScene:
         self._grip_pub = self.node.create_publisher(
             JointTrajectory, "/gripper_controller/joint_trajectory", 10
         )
+        self._head_pub = self.node.create_publisher(
+            JointTrajectory, "/head_controller/joint_trajectory", 10
+        )
         self._attach_pub = self.node.create_publisher(String, "/grasp_attach/command", 10)
-        self._set_state = self.node.create_client(
-            SetEntityState, "/gazebo/set_entity_state"
-        )
-        self._get_state = self.node.create_client(
-            GetEntityState, "/gazebo/get_entity_state"
-        )
+        if sim:
+            self._set_state = self.node.create_client(
+                SetEntityState, "/gazebo/set_entity_state"
+            )
+            self._get_state = self.node.create_client(
+                GetEntityState, "/gazebo/get_entity_state"
+            )
 
         self._executor = MultiThreadedExecutor(num_threads=2)
         self._executor.add_node(self.node)
@@ -82,7 +117,10 @@ class TiagoScene:
         self.wait_ready()
 
     # ------------------------------------------------------------------ state
+    _last_joint_wall = 0.0
+
     def _on_joints(self, msg: JointState):
+        self._last_joint_wall = time.time()
         with self._lock:
             self._joints.update(zip(msg.name, msg.position))
 
@@ -93,25 +131,68 @@ class TiagoScene:
                     [pose.position.x, pose.position.y, pose.position.z]
                 )
 
+    def _on_point(self, name, msg: PointStamped):
+        """Real robot: a perception estimate (base frame). Latched while the hand occludes the object."""
+        p = np.array([msg.point.x, msg.point.y, msg.point.z])
+        with self._lock:
+            have_q = all(j in self._joints for j in CHAIN_JOINTS)
+            q = np.array([self._joints[j] for j in CHAIN_JOINTS]) if have_q else None
+        if name == OBJECT_NAME and q is not None:
+            if self.carrying:
+                return
+            hand = self.chain.fk(q)[:3, 3]
+            if np.linalg.norm(hand[:2] - p[:2]) < OCCLUSION_RADIUS and hand[2] < OCCLUSION_HEIGHT:
+                if OBJECT_NAME in self._perc:
+                    return  # the gripper is over the object: keep the last clean estimate
+        with self._lock:
+            self._perc[name] = p
+            self._est_time[name] = time.time()
+
     def wait_ready(self, timeout: float = 60.0):
         t0 = time.time()
         while time.time() - t0 < timeout:
             with self._lock:
                 ok = all(j in self._joints for j in CHAIN_JOINTS + FINGER_JOINTS)
-                ok = ok and OBJECT_NAME in self._models
-            if ok and self._set_state.service_is_ready():
+                if self.sim:
+                    ok = ok and OBJECT_NAME in self._models
+            if ok and (not self.sim or self._set_state.service_is_ready()):
                 return
             time.sleep(0.2)
-        raise TimeoutError("TIAGo scene not ready (joint_states / model_states / services)")
+        raise TimeoutError("TIAGo not ready (joint_states / model_states / services)")
+
+    def wait_perception(self, timeout: float = 30.0, max_age: float = 1.5):
+        """Real robot: block until fresh object and pad estimates exist."""
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            now = time.time()
+            with self._lock:
+                ok = all(now - self._est_time.get(n, -1e9) < max_age for n in (OBJECT_NAME, PAD_NAME))
+            if ok:
+                return True
+            time.sleep(0.1)
+        return False
+
+    def unlatch_object(self):
+        """Real robot: forget the latched object estimate so the next detection is accepted."""
+        with self._lock:
+            self._perc.pop(OBJECT_NAME, None)
+            self._est_time.pop(OBJECT_NAME, None)
 
     def now(self) -> float:
         return self.node.get_clock().now().nanoseconds * 1e-9
 
     def sleep(self, seconds: float):
-        """Sleep in *simulation* time."""
+        """Sleep in (simulation or wall) time."""
         t0 = self.now()
         while self.now() - t0 < seconds:
             time.sleep(0.002)
+        if not self.sim:
+            self.check_alive()
+
+    def check_alive(self, max_age: float = 0.5):
+        """Real robot watchdog: abort if joint states stopped arriving."""
+        if self._last_joint_wall > 0 and time.time() - self._last_joint_wall > max_age:
+            raise RuntimeError("joint_states stopped (robot driver down or e-stop pressed)")
 
     def q(self) -> np.ndarray:
         with self._lock:
@@ -125,9 +206,23 @@ class TiagoScene:
     def ee_pos(self, q=None) -> np.ndarray:
         return self.chain.fk(self.q() if q is None else q)[:3, 3]
 
-    def model_pos(self, name: str) -> np.ndarray:
+    def truth_pos(self, name: str) -> np.ndarray:
+        """Gazebo ground truth (simulation only)."""
         with self._lock:
             return self._models[name].copy()
+
+    def model_pos(self, name: str) -> np.ndarray:
+        """What the robot knows: ground truth in plain sim, camera estimates otherwise."""
+        if not self.sim and name == "tiago":
+            return np.zeros(3)  # the base frame is the reference; nothing to re-pin
+        if self.use_perception and name in (OBJECT_NAME, PAD_NAME):
+            if name == OBJECT_NAME and self.carrying:
+                return self.ee_pos() + np.array([0.0, 0.0, -GRASP_DZ - self.z_offset])
+            with self._lock:
+                p = self._perc[name].copy()
+            p[2] -= self.z_offset
+            return p
+        return self.truth_pos(name)
 
     # --------------------------------------------------------------- commands
     def _send(self, pub, names, positions, duration):
@@ -139,11 +234,27 @@ class TiagoScene:
         msg.points = [pt]
         pub.publish(msg)
 
+    def _limited_duration(self, names, target, duration):
+        """Real robot: stretch the duration so no joint exceeds the speed limit; refuse jumps."""
+        with self._lock:
+            cur = np.array([self._joints[j] for j in names])
+        d = np.abs(np.asarray(target, float) - cur)
+        if d.max() > MAX_JUMP:
+            raise RuntimeError(f"refusing a {d.max():.2f} rad jump on {names[int(d.argmax())]}")
+        return max(duration, float(d.max() / self.max_joint_speed))
+
     def send_arm(self, q_arm, duration=0.15):
+        if not self.sim:
+            duration = self._limited_duration(ARM_JOINTS, q_arm, duration)
         self._send(self._arm_pub, ARM_JOINTS, q_arm, duration)
 
     def send_torso(self, height, duration=1.0):
+        if not self.sim:
+            duration = max(duration, abs(height - self.q()[0]) / 0.05)  # torso <= 5 cm/s
         self._send(self._torso_pub, [TORSO_JOINT], [height], duration)
+
+    def send_head(self, pan, tilt, duration=2.0):
+        self._send(self._head_pub, ["head_1_joint", "head_2_joint"], [pan, tilt], duration)
 
     def send_gripper(self, opening, duration=0.3):
         opening = float(np.clip(opening, GRIPPER_CLOSED, GRIPPER_OPEN))
@@ -152,13 +263,21 @@ class TiagoScene:
     # ------------------------------------------------------------------ grasp assist
     def attach_object(self):
         """Rigidly attach the object to the gripper (see gazebo_grasp_attach)."""
+        self.carrying = True  # real robot: bookkeeping only, the fingers hold the object
+        if not self.sim:
+            return
         self._attach_pub.publish(String(data=f"attach tiago arm_7_link {OBJECT_NAME} link"))
 
     def detach_object(self):
+        self.carrying = False
+        if not self.sim:
+            return
         self._attach_pub.publish(String(data=f"detach tiago arm_7_link {OBJECT_NAME} link"))
 
     # ------------------------------------------------------------------ scene
     def set_model_pos(self, name: str, pos, yaw: float = 0.0):
+        if not self.sim:
+            raise RuntimeError("cannot teleport objects on the real robot")
         req = SetEntityState.Request()
         req.state.name = name
         req.state.pose.position.x = float(pos[0])

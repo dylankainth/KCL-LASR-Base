@@ -13,6 +13,7 @@ import numpy as np
 
 from pick_and_place_rl.arm_control import ArmController
 from pick_and_place_rl.env import ACT_DIM, OBS_DIM, PickPlaceEnv, expert_action
+from pick_and_place_rl.perception import PerceptionNoise
 from pick_and_place_rl.policy import MLPPolicy
 from pick_and_place_rl.robot import TiagoScene
 
@@ -26,11 +27,19 @@ def main():
     ap.add_argument("--policy", default=None, help="npz policy; if set it drives with prob (1-beta)")
     ap.add_argument("--beta", type=float, default=0.5, help="prob. of executing the expert action per step (DAgger)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--perception", action="store_true", help="poses from the head-camera pipeline, not Gazebo")
+    ap.add_argument("--obs-noise", action="store_true", help="the policy sees camera-like noisy poses; labels stay clean")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    sc = TiagoScene(open(args.urdf).read())
-    env = PickPlaceEnv(sc, ArmController(sc), seed=args.seed)
+    urdf = open(args.urdf).read()
+    sc = TiagoScene(urdf, use_perception=args.perception)
+    if args.perception:
+        from pick_and_place_rl.perception_node import start_inprocess
+
+        start_inprocess(sc, urdf)
+    env = PickPlaceEnv(sc, ArmController(sc), seed=args.seed,
+                       obs_noise=PerceptionNoise(args.seed) if args.obs_noise else None)
     rng = np.random.default_rng(args.seed + 1000)
     policy = MLPPolicy.load(args.policy) if args.policy else None
 
@@ -42,7 +51,7 @@ def main():
         noisy = args.noise > 0 and rng.random() < args.noisy_fraction
         info = {}
         for _ in range(env.max_steps):
-            a_exp = expert_action(obs)
+            a_exp = expert_action(env.clean)  # label from the true state
             obs_buf.append(obs.copy())
             act_buf.append(a_exp.copy())
             ep_buf.append(ep)

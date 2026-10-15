@@ -9,6 +9,7 @@ import numpy as np
 
 from pick_and_place_rl.arm_control import ArmController
 from pick_and_place_rl.env import PickPlaceEnv, expert_action
+from pick_and_place_rl.perception import PerceptionNoise
 from pick_and_place_rl.policy import MLPPolicy
 from pick_and_place_rl.robot import TiagoScene
 from pick_and_place_rl.video import VideoRecorder
@@ -22,11 +23,20 @@ def main():
     ap.add_argument("--seed", type=int, default=12345)
     ap.add_argument("--video", default=None, help="mp4 path (all episodes in one file)")
     ap.add_argument("--label", default=None)
+    ap.add_argument("--perception", action="store_true",
+                    help="poses come from the head-camera pipeline (perception_node must run), not Gazebo")
+    ap.add_argument("--obs-noise", action="store_true", help="corrupt the poses the policy sees (camera-like)")
     ap.add_argument("--report", default=None, help="json file for per-episode results")
     args = ap.parse_args()
 
-    sc = TiagoScene(open(args.urdf).read())
-    env = PickPlaceEnv(sc, ArmController(sc), seed=args.seed)
+    urdf = open(args.urdf).read()
+    sc = TiagoScene(urdf, use_perception=args.perception)
+    if args.perception:
+        from pick_and_place_rl.perception_node import start_inprocess
+
+        start_inprocess(sc, urdf)
+    env = PickPlaceEnv(sc, ArmController(sc), seed=args.seed,
+                       obs_noise=PerceptionNoise(args.seed) if args.obs_noise else None)
     policy = MLPPolicy.load(args.policy) if args.policy else None
     label = args.label or ("Learned policy (behaviour cloning + DAgger)" if policy else "Scripted expert")
     rec = VideoRecorder(sc, args.video, fps=20) if args.video else None
@@ -49,8 +59,8 @@ def main():
         if rec:  # hold the final frame briefly so the outcome is visible
             rec.caption = f"{label} | episode {ep + 1}/{args.episodes} | {'SUCCESS' if info['success'] else 'FAIL'}"
             sc.sleep(1.0)
-        o = sc.model_pos("pick_object")
-        p = sc.model_pos("place_pad")
+        o = sc.truth_pos("pick_object")
+        p = sc.truth_pos("place_pad")
         err = float(np.linalg.norm(o[:2] - p[:2]))
         results.append({"episode": ep, "success": bool(info["success"]), "steps": int(info["steps"]), "place_error_m": err})
         print(f"ep {ep + 1}/{args.episodes} success={info['success']} steps={info['steps']} place_err={err * 100:.1f}cm wall={time.time() - t0:.0f}s", flush=True)

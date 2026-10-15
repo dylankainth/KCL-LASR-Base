@@ -18,7 +18,10 @@ HOVER_Z = 1.05
 
 
 class ArmController:
-    def __init__(self, scene: TiagoScene):
+    def __init__(self, scene: TiagoScene, z_offset: float = 0.0):
+        """z_offset: real table height minus the 0.815 m the policy was trained with. All hand
+        heights seen or commanded here are in the *virtual* frame (real z minus z_offset)."""
+        self.z_off = z_offset
         self.sc = scene
         self.chain = scene.chain
         self.r_down = rotation_from_axes(
@@ -31,18 +34,22 @@ class ArmController:
     # ------------------------------------------------------------------ basics
     def hand_pos(self) -> np.ndarray:
         """Measured grasp-frame position (base frame)."""
-        return self.chain.fk(self.sc.q())[:3, 3]
+        p = self.chain.fk(self.sc.q())[:3, 3].copy()
+        p[2] -= self.z_off
+        return p
 
     def cmd_hand_pos(self) -> np.ndarray:
         """Grasp-frame position of the last commanded joint vector."""
-        return self.chain.fk(self.q_cmd)[:3, 3]
+        p = self.chain.fk(self.q_cmd)[:3, 3].copy()
+        p[2] -= self.z_off
+        return p
 
     def ik(self, target, q0=None, iters=15, pref=Q_SEED):
         q0 = self.q_cmd if q0 is None else q0
         q, ok = solve_ik(
             self.chain,
             q0,
-            np.asarray(target, float),
+            np.asarray(target, float) + np.array([0.0, 0.0, self.z_off]),
             self.r_down,
             q_pref=pref,
             pref_gain=0.1,
@@ -108,7 +115,7 @@ class ArmController:
                 Q_SEED + np.r_[0.0, rng.normal(0, 0.5, 7)], self.chain.lower, self.chain.upper
             )
             q, ok = solve_ik(
-                self.chain, q0, np.asarray(target, float), self.r_down,
+                self.chain, q0, np.asarray(target, float) + np.array([0.0, 0.0, self.z_off]), self.r_down,
                 q_pref=Q_SEED, pref_gain=0.2, free=self.free, max_iters=300,
             )
             if not ok:

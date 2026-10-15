@@ -83,10 +83,14 @@ def expert_action(obs: np.ndarray) -> np.ndarray:
 
 
 class PickPlaceEnv:
-    def __init__(self, scene: TiagoScene, arm: ArmController, max_steps=250, seed=0):
+    def __init__(self, scene: TiagoScene, arm: ArmController, max_steps=250, seed=0, step_scale=1.0,
+                 obs_noise=None):
         self.sc = scene
         self.arm = arm
         self.max_steps = max_steps
+        self.clean = None
+        self.step_scale = step_scale  # < 1 slows the hand down (real robot first trials)
+        self.obs_noise = obs_noise  # PerceptionNoise or None (sim: corrupts what the policy sees)
         self.rng = np.random.default_rng(seed)
         self.grip_cmd = False
         self.attached = False
@@ -115,13 +119,18 @@ class PickPlaceEnv:
         pad_xy = self._uniform(PAD_REGION)
         return obj_xy, pad_xy
 
-    def obs(self) -> np.ndarray:
+    def clean_obs(self) -> np.ndarray:
         h = self.arm.hand_pos()
         o = self.sc.model_pos(OBJECT_NAME)
         p = self.sc.model_pos(PAD_NAME)
         return np.array(
             [*h, *(o - h), *(p - h), self.sc.gripper_opening(), float(self.grip_cmd), float(self.attached)]
         )
+
+    def obs(self) -> np.ndarray:
+        o = self.clean_obs()
+        self.clean = o  # what the expert labels from (the policy only sees the possibly-noisy version)
+        return o if self.obs_noise is None else self.obs_noise(o)
 
     # -------------------------------------------------------------------- reset
     def reset(self, obj_xy=None, pad_xy=None, hand_xy=None) -> np.ndarray:
@@ -131,7 +140,12 @@ class PickPlaceEnv:
         sc.sleep(0.1)
         self.ensure_base()
         self.grip_cmd = False
+        if self.obs_noise is not None:
+            self.obs_noise.new_episode()
         sc.send_gripper(GRIP_OPEN_CMD, 0.6)
+
+        if not sc.sim:
+            return self._reset_real(hand_xy)
 
         if obj_xy is None or pad_xy is None:
             s_obj, s_pad = self.sample_task()
@@ -149,6 +163,30 @@ class PickPlaceEnv:
         sc.set_model_pos(PAD_NAME, [pad_xy[0], pad_xy[1], PAD_Z])
         sc.set_model_pos(OBJECT_NAME, [obj_xy[0], obj_xy[1], OBJ_Z + 0.002])
         sc.sleep(0.6)
+        if sc.use_perception:  # the robot sees the new scene through the camera pipeline
+            sc.unlatch_object()
+            sc.sleep(0.5)
+            if not sc.wait_perception(timeout=20.0, max_age=2.0):
+                raise RuntimeError("perception did not see the object and pad after the reset")
+            sc.sleep(1.0)
+        self.steps = 0
+        return self.obs()
+
+    def _reset_real(self, hand_xy):
+        """Real robot: nothing is teleported. A person places the object and pad before this call."""
+        sc, arm = self.sc, self.arm
+        hand_xy = self._uniform(HAND_START_REGION) if hand_xy is None else hand_xy
+        if not self._arm_ready:
+            arm.go_ready(over_xy=hand_xy)
+            self._arm_ready = True
+        else:
+            h = arm.cmd_hand_pos()
+            arm.move_to([h[0], h[1], HOVER_Z], speed=0.1)
+            arm.move_to([hand_xy[0], hand_xy[1], HOVER_Z], speed=0.1)
+        sc.unlatch_object()
+        if not sc.wait_perception(timeout=30.0):
+            raise RuntimeError("perception never saw both the object and the pad")
+        sc.sleep(1.0)
         self.steps = 0
         return self.obs()
 
@@ -156,7 +194,7 @@ class PickPlaceEnv:
     def step(self, action):
         sc, arm = self.sc, self.arm
         action = np.asarray(action, float)
-        delta = np.clip(action[:3], -MAX_STEP, MAX_STEP)
+        delta = np.clip(action[:3], -MAX_STEP, MAX_STEP) * self.step_scale
         target = np.clip(arm.cmd_hand_pos() + delta, WORKSPACE_LO, WORKSPACE_HI)
         want_close = bool(action[3] > 0.5)
         if want_close != self.grip_cmd:
@@ -167,6 +205,7 @@ class PickPlaceEnv:
 
         o = sc.model_pos(OBJECT_NAME)
         h = arm.hand_pos()
+        ot = sc.truth_pos(OBJECT_NAME) if sc.sim else o  # success is judged on ground truth in sim
         if self.grip_cmd and not self.attached and sc.gripper_opening() <= CLOSED_ON_OBJ:
             if np.linalg.norm((o - h) - np.array([0, 0, -GRASP_DZ])) < 0.03:
                 sc.attach_object()
@@ -176,9 +215,9 @@ class PickPlaceEnv:
             self.attached = False
 
         self.steps += 1
-        p = sc.model_pos(PAD_NAME)
-        on_pad = np.linalg.norm(o[:2] - p[:2]) < PLACE_TOL and o[2] < OBJ_Z + 0.03
+        pt = sc.truth_pos(PAD_NAME) if sc.sim else sc.model_pos(PAD_NAME)
+        on_pad = np.linalg.norm(ot[:2] - pt[:2]) < PLACE_TOL and ot[2] < OBJ_Z + 0.03
         success = on_pad and (not self.attached) and (not self.grip_cmd) and h[2] > HOVER_Z - 0.03
-        fell = o[2] < 0.80 or np.linalg.norm(o[:2] - np.array([0.63, 0.0])) > 0.7
+        fell = ot[2] < 0.80 or np.linalg.norm(ot[:2] - np.array([0.63, 0.0])) > 0.7
         done = success or fell or self.steps >= self.max_steps
         return self.obs(), done, {"success": bool(success), "fell": bool(fell), "steps": self.steps}
