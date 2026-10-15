@@ -56,3 +56,20 @@ python3 -m pick_and_place_rl.collect --episodes 60 --policy data/policy0.npz --b
 # evaluate + record a video
 python3 -m pick_and_place_rl.evaluate --policy data/policy1.npz --episodes 30 --video out.mp4
 ```
+
+## Results (Gazebo, 30 unseen random tasks, seed 777)
+
+| Policy | Training data | Success | Mean place error |
+| :--- | :--- | :--- | :--- |
+| Scripted expert | - | 10 / 10 | - |
+| `eval_bc_only.json` | 120 expert episodes (70 % with action noise, DART), 17.8 k samples | 19 / 20 | 0.1 cm |
+| `models/policy.npz` (`eval_bc_dagger.json`) | + 60 DAgger episodes (6.5 k samples) | **30 / 30** | 0.1 cm |
+
+The 5-episode demo video (different seed) also succeeded 5/5. The policy is a 3x256 MLP (state in, 4-D action out)
+trained by behaviour cloning on the expert's labels; DAgger rounds relabel the states the learned policy visits.
+No reinforcement learning was used: with a privileged-state expert and Gazebo running at ~1x real time, imitation
+(BC + DART + DAgger) needs ~10^4 samples, where RL would need orders of magnitude more simulator time.
+
+Caveats: ground-truth poses (no perception), a grasp-assist joint (see above), fixed object shape, and
+evaluation on the same table/pad regions used for training. Run `scripts/run_lasr.sh` etc. from the WSL host
+(they assume the layout in `documentation/WSL_APPTAINER_SETUP.md`).

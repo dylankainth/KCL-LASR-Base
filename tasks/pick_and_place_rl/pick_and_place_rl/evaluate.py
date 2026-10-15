@@ -30,13 +30,14 @@ def main():
     policy = MLPPolicy.load(args.policy) if args.policy else None
     label = args.label or ("Learned policy (behaviour cloning + DAgger)" if policy else "Scripted expert")
     rec = VideoRecorder(sc, args.video, fps=20) if args.video else None
-    if rec:
-        rec.start()
-
     results = []
     t0 = time.time()
     for ep in range(args.episodes):
+        if rec:
+            rec.caption = f"{label} | resetting scene"
         obs = env.reset()
+        if rec and ep == 0:
+            rec.start()  # skip the one-off arm set-up from the tucked pose
         info = {}
         for t in range(env.max_steps):
             act = policy.act(obs) if policy else expert_action(obs)
