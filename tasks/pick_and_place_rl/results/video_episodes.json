@@ -1,0 +1,37 @@
+{
+ "policy": "/ros_ws/data/policy1.npz",
+ "successes": 5,
+ "episodes": 5,
+ "results": [
+  {
+   "episode": 0,
+   "success": true,
+   "steps": 92,
+   "place_error_m": 0.0008790214909531042
+  },
+  {
+   "episode": 1,
+   "success": true,
+   "steps": 85,
+   "place_error_m": 0.0012967800096263427
+  },
+  {
+   "episode": 2,
+   "success": true,
+   "steps": 91,
+   "place_error_m": 0.0014434031451625363
+  },
+  {
+   "episode": 3,
+   "success": true,
+   "steps": 84,
+   "place_error_m": 0.0015597677068643857
+  },
+  {
+   "episode": 4,
+   "success": true,
+   "steps": 105,
+   "place_error_m": 0.0015538682368828045
+  }
+ ]
+}
