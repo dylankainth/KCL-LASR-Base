@@ -29,7 +29,7 @@ OBJ_REGION = ((0.58, 0.68), (0.05, 0.28))
 PAD_REGION = ((0.58, 0.68), (-0.28, -0.08))
 HAND_START_REGION = ((0.55, 0.68), (-0.20, 0.20))
 WORKSPACE_LO = np.array([0.45, -0.32, 0.915])
-WORKSPACE_HI = np.array([0.72, 0.32, 1.10])
+WORKSPACE_HI = np.array([0.72, 0.32, max(1.10, HOVER_Z + 0.05)])
 
 OBS_DIM = 12
 ACT_DIM = 4
@@ -102,6 +102,8 @@ class PickPlaceEnv:
         self.steps = 0
         self._arm_ready = False
         self.base_resets = 0
+        self._stall = 0  # consecutive steps the commanded target was far from the hand (real robot watchdog)
+        self._stall_ref = None
         self.pin_base = True  # sim: teleport the base back to the origin if it drifts (off when the robot parks itself)
         self.sc.detach_object()  # drop any joint left over from a previous run
         self.sc.sleep(0.2)
@@ -201,6 +203,25 @@ class PickPlaceEnv:
         self.steps = 0
         return self.obs()
 
+    def _check_following(self, target, far=0.02, steps=50, still=0.004):
+        """Real robot: abort if the hand stays put while the command is far from it (controller rejected or
+        aborted the goals, joint limit, collision). Without this the loop would run on silently."""
+        h = self.arm.hand_pos()
+        if np.linalg.norm(target - h) <= far:
+            self._stall, self._stall_ref = 0, None
+            return
+        if self._stall == 0:
+            self._stall_ref = h.copy()
+        self._stall += 1
+        if self._stall >= steps:
+            if np.linalg.norm(h - self._stall_ref) < still:
+                rej = getattr(self.sc._arm_pub, "rejected", 0)
+                raise RuntimeError(
+                    f"arm not following: hand stuck at {h.round(3)} for {steps} steps while the target is {target.round(3)} "
+                    f"({rej} arm goals rejected so far). Check the e-stop, controller state, joint limits and obstacles."
+                )
+            self._stall, self._stall_ref = 0, None
+
     # --------------------------------------------------------------------- step
     def step(self, action):
         sc, arm = self.sc, self.arm
@@ -224,6 +245,8 @@ class PickPlaceEnv:
             sc.send_gripper(self.grip_close_cmd if want_close else GRIP_OPEN_CMD, 1.0)
         arm.servo(target, DT)
         self.ensure_base()
+        if not sc.sim:
+            self._check_following(target)
 
         o = sc.model_pos(OBJECT_NAME)
         h = arm.hand_pos()

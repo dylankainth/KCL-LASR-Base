@@ -40,6 +40,9 @@ def main():
     ap.add_argument("--approach-only", action="store_true")
     ap.add_argument("--displace", type=float, nargs=3, default=None, metavar=("X", "Y", "YAW_DEG"),
                     help="teleport the base here first, so the run has to park itself")
+    ap.add_argument("--no-park", action="store_true", help="run_real --no-park (report only; must refuse if a move is needed)")
+    ap.add_argument("--calib", default=None)
+    ap.add_argument("--grip-close", type=float, default=None)
     ap.add_argument("--speed-scale", type=float, default=0.3)
     ap.add_argument("--step-scale", type=float, default=0.4)
     args = ap.parse_args()
@@ -63,10 +66,16 @@ def main():
         cmd += ["--expert"] if args.expert else ["--policy", args.policy]
         if args.approach_only:
             cmd += ["--approach-only"]
-        if args.displace:
+        if args.no_park:
+            cmd += ["--no-park"]
+        if args.calib:
+            cmd += ["--calib", args.calib]
+        if args.grip_close is not None:
+            cmd += ["--grip-close", str(args.grip_close)]
+        if args.displace and not args.no_park:
             cmd += ["--odom", "/ground_truth_odom"]  # Gazebo's wheel odometry slips at low speed; ground truth stands in
         # answers: Start? y | arm tucked? y | placed (Enter) | [park: drive? y] | look right? y | succeeded? y
-        answers = "y\ny\n\n" + ("y\n" if args.displace else "") + "y\ny\n"
+        answers = "y\ny\n\n" + ("y\n" if args.displace and not args.no_park else "") + "y\ny\n"
         r = subprocess.run(cmd, input=answers, text=True, capture_output=True, timeout=1500)
         print(r.stdout[-6000:])
         print(r.stderr[-3000:])

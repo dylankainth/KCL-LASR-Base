@@ -1,5 +1,7 @@
 """Cartesian arm control on top of TiagoScene (top-down grasps, torso fixed)."""
 
+import os
+
 import numpy as np
 
 from pick_and_place_rl.kinematics import rotation_from_axes, solve_ik
@@ -13,8 +15,8 @@ Q_SEED = np.array([TORSO_HEIGHT, 1.05, 0.57, -0.83, 1.7, 0.64, -0.89, 0.72])
 Q_WRIST = np.array([TORSO_HEIGHT, 0.5, -1.34, -0.48, 1.94, -1.49, 1.37, -1.58])
 Q_UNFOLD = np.array([TORSO_HEIGHT, 0.2, 0.35, -0.2, 1.94, -1.57, 1.37, -1.58])
 # Hand height for travelling above the table. Fingertips hang ~0.10 m below the hand frame and the
-# object top is at 0.915, so this keeps them ~3 cm clear.
-HOVER_Z = 1.05
+# object top is at 0.915, so this keeps them ~3 cm clear. PP_HOVER_Z overrides it (experiments only).
+HOVER_Z = float(os.environ.get("PP_HOVER_Z", "1.05"))
 STEP_DQ = 0.08  # rad, per-step joint change limit on the real arm
 
 

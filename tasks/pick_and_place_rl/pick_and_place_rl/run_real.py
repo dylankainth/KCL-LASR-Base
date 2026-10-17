@@ -153,7 +153,7 @@ def main():
                     print("  Check by eye that the open fingers straddle the object (it should be centred).")
                     break
                 if t % 20 == 0:
-                    print(f"  step {t}: hand {obs[0:3].round(3)} grip {obs[10]:.0f} attached {obs[11]:.0f}", flush=True)
+                    print(f"  step {t}: hand {obs[0:3].round(3)} object-hand {obs[3:6].round(3)} grip {obs[10]:.0f} attached {obs[11]:.0f}", flush=True)
                 if done:
                     break
             sc.sleep(1.0)

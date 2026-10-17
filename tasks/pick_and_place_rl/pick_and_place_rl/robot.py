@@ -1,6 +1,7 @@
 """ROS 2 interface to TIAGo + the pick_place Gazebo scene."""
 
 import threading
+import os
 import time
 
 import numpy as np
@@ -48,20 +49,34 @@ def _duration(seconds: float) -> Duration:
 class _TrajectoryOut:
     """Sends single-point trajectories to a PAL controller.
 
-    Primary path: the `/<name>_controller/follow_joint_trajectory` action (the interface the rest of this repo
-    uses on the real robot). A new goal replaces the previous one, so streaming small servo goals works.
-    Fallback: the `/<name>_controller/joint_trajectory` topic, used when no action server answers."""
+    prefer="action": the `/<name>_controller/follow_joint_trajectory` action, falling back to the topic.
+    prefer="topic":  the `/<name>_controller/joint_trajectory` topic if the controller subscribes to it, else the
+                     action. Used for the arm: the servo loop streams a new goal every 0.1 s, and in Gazebo every
+                     action goal replaces the previous one, which made the arm swing against its commands (expert
+                     20/30 vs 30/30 over the topic, same seed). One-shot moves (torso, head, gripper) use actions.
+    prefer="topic-only": never use actions."""
 
-    def __init__(self, node, name, use_action=True, wait=3.0):
+    def __init__(self, node, name, prefer="action", wait=3.0):
         self.name = name
         self.goals_sent = 0
         self.rejected = 0
         self.action = None
-        if use_action:
-            client = ActionClient(node, FollowJointTrajectory, f"/{name}_controller/follow_joint_trajectory")
-            if client.wait_for_server(timeout_sec=wait):
-                self.action = client
-        self.pub = None if self.action else node.create_publisher(JointTrajectory, f"/{name}_controller/joint_trajectory", 10)
+        self.pub = None
+        topic = f"/{name}_controller/joint_trajectory"
+        if prefer in ("topic", "topic-only"):
+            self.pub = node.create_publisher(JointTrajectory, topic, 10)
+            t0 = time.time()
+            while self.pub.get_subscription_count() == 0 and time.time() - t0 < wait:
+                time.sleep(0.05)
+            if self.pub.get_subscription_count() > 0 or prefer == "topic-only":
+                return
+            node.destroy_publisher(self.pub)
+            self.pub = None
+        client = ActionClient(node, FollowJointTrajectory, f"/{name}_controller/follow_joint_trajectory")
+        if client.wait_for_server(timeout_sec=wait):
+            self.action = client
+            return
+        self.pub = node.create_publisher(JointTrajectory, topic, 10)
 
     @property
     def mode(self):
@@ -136,10 +151,15 @@ class TiagoScene:
             self.node.create_subscription(Float64MultiArray, "/pick_place/table", self._on_table, 5)
         self._table = None
         self._table_time = 0.0
-        self._arm_pub = _TrajectoryOut(self.node, "arm", use_actions)
-        self._torso_pub = _TrajectoryOut(self.node, "torso", use_actions)
-        self._grip_pub = _TrajectoryOut(self.node, "gripper", use_actions)
-        self._head_pub = _TrajectoryOut(self.node, "head", use_actions)
+        if not use_actions or os.environ.get("PP_USE_TOPICS") == "1":
+            arm_pref = other_pref = "topic-only"
+        else:
+            arm_pref = os.environ.get("PP_ARM_INTERFACE", "topic")  # see _TrajectoryOut: streaming goals go over the topic
+            other_pref = "action"
+        self._arm_pub = _TrajectoryOut(self.node, "arm", arm_pref)
+        self._torso_pub = _TrajectoryOut(self.node, "torso", other_pref)
+        self._grip_pub = _TrajectoryOut(self.node, "gripper", other_pref)
+        self._head_pub = _TrajectoryOut(self.node, "head", other_pref)
         self.command_modes = {o.name: o.mode for o in (self._arm_pub, self._torso_pub, self._grip_pub, self._head_pub)}
         self._attach_pub = self.node.create_publisher(String, "/grasp_attach/command", 10)
         if sim:
@@ -272,10 +292,17 @@ class TiagoScene:
         if not self.sim:
             self.check_alive()
 
-    def check_alive(self, max_age: float = 0.5):
-        """Real robot watchdog: abort if joint states stopped arriving."""
+    def check_alive(self, max_age: float = 0.5, max_stall: float = 5.0):
+        """Real robot watchdog. A short gap in joint_states (network/DDS hiccup) is waited out; a gap longer than
+        max_stall (driver down, e-stop pressed) aborts. While waiting nothing new is commanded."""
         if self._last_joint_wall > 0 and time.time() - self._last_joint_wall > max_age:
-            raise RuntimeError("joint_states stopped (robot driver down or e-stop pressed)")
+            t0 = time.time()
+            print(f"[robot] WARNING: no joint_states for {time.time() - self._last_joint_wall:.1f} s; waiting up to {max_stall:.0f} s", flush=True)
+            while time.time() - self._last_joint_wall > max_age:
+                if time.time() - t0 > max_stall:
+                    raise RuntimeError("joint_states stopped (robot driver down or e-stop pressed)")
+                time.sleep(0.05)
+            print(f"[robot] joint_states back after {time.time() - t0:.1f} s; continuing", flush=True)
 
     def q(self) -> np.ndarray:
         with self._lock:
