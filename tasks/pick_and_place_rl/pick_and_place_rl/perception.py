@@ -36,8 +36,8 @@ class ColourRange:
 
 
 # Blue object, red pad (the sim scene). Change these for the real colours, see the runbook.
-BLUE = ColourRange(190.0, 260.0, 0.45, 0.20)
-RED = ColourRange(345.0, 15.0, 0.55, 0.25)
+BLUE = ColourRange(190.0, 260.0, 0.45, 0.14)  # value floor low enough for a dim room; saturation does the work
+RED = ColourRange(345.0, 15.0, 0.55, 0.14)
 
 
 def rgb_to_hsv(rgb: np.ndarray):
@@ -60,13 +60,13 @@ def rgb_to_hsv(rgb: np.ndarray):
     return h, s, mx
 
 
-def clean_mask(mask: np.ndarray, min_pixels: int = 30) -> np.ndarray:
-    """Keep the largest 4-connected blob (iterative flood fill on a small grid, no scipy/cv2)."""
+def blobs(mask: np.ndarray, min_pixels: int = 30, max_blobs: int = 4):
+    """4-connected blobs of `mask`, largest first (iterative flood fill on a small grid, no scipy/cv2)."""
     if mask.sum() < min_pixels:
-        return np.zeros_like(mask)
+        return []
     ys, xs = np.nonzero(mask)
     seen = np.zeros_like(mask, bool)
-    best = None
+    found = []
     h, w = mask.shape
     for y0, x0 in zip(ys[::7], xs[::7]):  # a coarse seed set is enough to find every big blob
         if seen[y0, x0]:
@@ -81,14 +81,21 @@ def clean_mask(mask: np.ndarray, min_pixels: int = 30) -> np.ndarray:
                 if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
                     seen[ny, nx] = True
                     stack.append((ny, nx))
-        if best is None or len(pts) > len(best):
-            best = pts
-    if best is None or len(best) < min_pixels:
-        return np.zeros_like(mask)
-    out = np.zeros_like(mask)
-    arr = np.array(best)
-    out[arr[:, 0], arr[:, 1]] = True
+        if len(pts) >= min_pixels:
+            found.append(pts)
+    out = []
+    for pts in sorted(found, key=len, reverse=True)[:max_blobs]:
+        m = np.zeros_like(mask)
+        arr = np.array(pts)
+        m[arr[:, 0], arr[:, 1]] = True
+        out.append(m)
     return out
+
+
+def clean_mask(mask: np.ndarray, min_pixels: int = 30) -> np.ndarray:
+    """Keep the largest 4-connected blob."""
+    found = blobs(mask, min_pixels, max_blobs=1)
+    return found[0] if found else np.zeros_like(mask)
 
 
 def depth_to_metres(depth: np.ndarray, encoding: str) -> np.ndarray:
@@ -114,39 +121,69 @@ def transform_points(pts: np.ndarray, T: np.ndarray) -> np.ndarray:
     return pts @ T[:3, :3].T + T[:3, 3]
 
 
-def object_centre(points_base: np.ndarray, height: float = OBJECT_HEIGHT, cap_band: float = 0.012):
-    """Centre of a vertical cylinder from the visible surface points (base frame)."""
+OBJECT_DIAMETER = 0.05  # m (trained on r = 2.5 cm)
+OBJECT_EXTENT = (0.03, 0.08)  # accepted width of the visible top cap, per axis (m)
+PAD_EXTENT = (0.07, 0.24)  # accepted size of the red patch, per axis (m)
+
+
+def _extent_centre(xy: np.ndarray, q: float):
+    lo, hi = np.percentile(xy, q, axis=0), np.percentile(xy, 100 - q, axis=0)
+    return (lo + hi) / 2, hi - lo
+
+
+def object_centre(points_base: np.ndarray, height: float = OBJECT_HEIGHT, cap_band: float = 0.012, with_extent=False):
+    """Centre of a vertical cylinder from the visible surface points (base frame).
+
+    The cap band also catches a strip of the side facing the camera, so a median of its xy is pulled ~8 mm toward
+    the camera. Every point of the strip lies inside the cap's disc, so the middle of the xy extent is unbiased.
+    Points beyond the can radius from a first estimate (flying pixels at the silhouette) are dropped first.
+    Returns the centre (or None); with `with_extent` also the cap's xy extent for plausibility checks.
+    """
     if len(points_base) < 20:
-        return None
+        return (None, None) if with_extent else None
     zmax = np.percentile(points_base[:, 2], 97)
     cap = points_base[points_base[:, 2] > zmax - cap_band]
     if len(cap) < 10:
-        return None
-    return np.array([np.median(cap[:, 0]), np.median(cap[:, 1]), np.median(cap[:, 2]) - height / 2])
+        return (None, None) if with_extent else None
+    _, ext = _extent_centre(cap[:, :2], 2.0)  # size of what was seen, before trimming (a big flat blob must fail)
+    first = np.median(cap[:, :2], axis=0)
+    cap = cap[np.linalg.norm(cap[:, :2] - first, axis=1) < OBJECT_DIAMETER / 2 + 0.015]
+    if len(cap) < 10:
+        return (None, None) if with_extent else None
+    mid, _ = _extent_centre(cap[:, :2], 0.5)
+    c = np.array([mid[0], mid[1], np.median(cap[:, 2]) - height / 2])
+    return (c, ext) if with_extent else c
 
 
-def pad_centre(points_base: np.ndarray, thickness: float = PAD_THICKNESS):
+def pad_centre(points_base: np.ndarray, thickness: float = PAD_THICKNESS, with_extent=False):
     if len(points_base) < 20:
-        return None
+        return (None, None) if with_extent else None
     z = np.median(points_base[:, 2])
     flat = points_base[np.abs(points_base[:, 2] - z) < 0.01]
     if len(flat) < 20:
-        return None
+        return (None, None) if with_extent else None
     # the visible patch can be partly hidden by the object, so use the bounding-box centre
     lo, hi = np.percentile(flat[:, :2], 3, axis=0), np.percentile(flat[:, :2], 97, axis=0)
-    return np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, z - thickness / 2])
+    c = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, z - thickness / 2])
+    return (c, hi - lo) if with_extent else c
 
 
 def detect(rgb, depth_m, K, T_base_cam, obj_colour=BLUE, pad_colour=RED):
-    """One frame -> (object_centre | None, pad_centre | None) in the base frame."""
+    """One frame -> (object_centre | None, pad_centre | None) in the base frame.
+
+    Every colour blob is tried, largest first, and the first one whose physical size fits a can (cap ~5 cm wide)
+    or a pad (~14 cm) wins, so a bigger blue/red thing in view (a folder, a chair, a mug) is not mistaken for them.
+    """
     out = []
-    for colour, fn in ((obj_colour, object_centre), (pad_colour, pad_centre)):
-        m = clean_mask(colour.mask(rgb))
-        if not m.any():
-            out.append(None)
-            continue
-        pts = transform_points(deproject(m, depth_m, K), T_base_cam)
-        out.append(fn(pts))
+    for colour, fn, (lo, hi) in ((obj_colour, object_centre, OBJECT_EXTENT), (pad_colour, pad_centre, PAD_EXTENT)):
+        pick = None
+        for m in blobs(colour.mask(rgb)):
+            pts = transform_points(deproject(m, depth_m, K), T_base_cam)
+            c, ext = fn(pts, with_extent=True)
+            if c is not None and np.all(ext > lo) and np.all(ext < hi):
+                pick = c
+                break
+        out.append(pick)
     return out[0], out[1]
 
 

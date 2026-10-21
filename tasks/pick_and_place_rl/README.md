@@ -20,6 +20,7 @@ This is separate from `tasks/pick_and_place` (the RoboCup task, where a human do
 | Policy inference (numpy, container) | `policy.py` |
 | Evaluation + video | `evaluate.py`, `video.py` |
 | Camera perception (colour + depth), table height/edge | `perception.py`, `perception_node.py`, `table.py` |
+| Offline perception stress test, regression tests | `synthetic_check.py`, `test/test_offline.py` |
 | Parking: base driver, planner, Gazebo test | `base.py`, `park.py`, `park_test.py` |
 | Real-robot runner, preflight, calibration, grip test, rehearsal | `run_real.py`, `preflight.py`, `calibrate.py`, `grip_test.py`, `rehearsal.py`, `REAL_ROBOT.md` |
 
@@ -84,6 +85,27 @@ No reinforcement learning was used: with a privileged-state expert and Gazebo ru
 | Same | scripted expert | 24 / 30 |
 
 Perception alone (`perception_check`): object 0.55 cm, pad 0.16 cm mean error over 20 random placements, no misses.
+That 0.55 cm was a systematic offset of the old object estimator (see "Offline perception stress test" below); after the
+fix the same check gives object **0.05 cm** (max 0.07), pad 0.16 cm, no misses. The 19/20, 24/30 and 25/30 rows above
+were measured with the old estimator and have not been re-run.
+
+### Offline perception stress test (no ROS, numpy only)
+
+`python3 -m pick_and_place_rl.synthetic_check` renders the table, can and pad with a ray-cast pinhole camera and
+degrades it like a real depth camera (range-dependent depth noise, mm quantisation, dropouts, flying pixels at
+edges, RGB/depth misregistration, dim/bright/coloured light, glare, distractors, head-tilt error). The noise figures
+are typical Xtion/Astra-class **assumptions, not measurements of the TIAGo camera**. It found three things, now fixed:
+
+| Finding | Before | After |
+| :--- | :--- | :--- |
+| Object estimate bias on perfect data (the cap band included a strip of the can's side, pulling the median toward the camera) | 0.85 cm | 0.23 cm (Gazebo: 0.55 → 0.05 cm) |
+| A bigger blue blob in view (folder, chair) was taken for the can | 43 cm error | ignored; blobs are chosen by physical size |
+| Pad lost in a dim room (value threshold 0.25) | missed | found (threshold 0.14) |
+
+Remaining sensitivity (these are systematic, `calibrate.py` removes a constant offset): 1 deg head-tilt error gives
+~1.2 cm table-height error and ~0.8 cm object error; 4 px depth/RGB misregistration ~0.6 cm. The table-edge distance
+has ~0.9 cm stride-quantisation bias (depth subsampled by 3), harmless for parking (2 cm margin).
+`python3 -m unittest discover -s test` runs the offline regression tests.
 The extra DAgger round with noisy observations (`policy_noise_dagger.npz`) did **not** help, so `policy.npz` stays
 the default. The expert is no better than the policy under this noise, so the noise level, not the network, is
 what limits success; the numbers are within the spread expected from 30 episodes. Results files are in `results/`.

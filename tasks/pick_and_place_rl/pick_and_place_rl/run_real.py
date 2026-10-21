@@ -19,7 +19,7 @@ import time
 import numpy as np
 
 from pick_and_place_rl.arm_control import TORSO_HEIGHT, ArmController
-from pick_and_place_rl.env import PickPlaceEnv, expert_action
+from pick_and_place_rl.env import PickPlaceEnv, expert_action, scene_problems
 from pick_and_place_rl.head import solve_head
 from pick_and_place_rl.policy import MLPPolicy
 from pick_and_place_rl.preflight import fetch_urdf
@@ -132,6 +132,9 @@ def main():
         sys.exit(f"PARK FAILED: {park_report.msg}. Fix the placement or robot position and run again.")
     o, p = sc.model_pos("pick_object"), sc.model_pos("place_pad")
     print(f"perceived (virtual frame): object {o.round(3)}, pad {p.round(3)}")
+    bad = scene_problems(o, p)
+    if bad:
+        sys.exit("NOT MOVING THE ARM, the perceived scene is not plausible:\n  " + "\n  ".join(bad))
     if not ask("Do these look right?"):
         return
 

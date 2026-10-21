@@ -18,6 +18,7 @@ Runtime needs only numpy + rclpy (torch is host-only, for training).
 | Learning | `collect.py` (BC/DART/DAgger data), `scripts/train_bc.py` (host, torch → `.npz`), `evaluate.py`, `video.py` |
 | Perception | `perception.py` (HSV colour + depth → base_footprint points; pure numpy), `perception_node.py` (publishes `/pick_place/object`, `/pad`, `/table`), `table.py` (table height + near edge fit), `perception_check.py`, `snapshot.py` |
 | Real robot | `run_real.py` (main runner), `park.py` (auto-park), `preflight.py` (read-only checks), `calibrate.py` (camera offset by eye), `grip_test.py`, `rehearsal.py` (real code path vs Gazebo), `selftest.py` (scripted-human test of calibrate/grip_test), `park_test.py`, `base_probe.py`, `topic_probe.py` |
+| Offline tests | `synthetic_check.py` (ray-cast imperfect camera vs perception/table), `test/test_offline.py` (`python3 -m unittest discover -s test`, numpy only, runs in WSL host python or any env with numpy) |
 | Scripts | `scripts/{sync,start_sim,run_lasr,job}.sh` — WSL host helpers (see below) |
 | Artifacts | `models/policy.npz` (default), `policy_noise_dagger.npz`; `results/*.json` evaluation outputs |
 

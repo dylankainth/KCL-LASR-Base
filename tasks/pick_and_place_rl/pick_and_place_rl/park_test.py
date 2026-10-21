@@ -20,6 +20,7 @@ from pick_and_place_rl.env import (GRIP_OPEN_CMD, OBJ_REGION, OBJ_Z, PAD_REGION,
 from pick_and_place_rl.park import auto_park
 from pick_and_place_rl.perception_node import start_inprocess
 from pick_and_place_rl.robot import TiagoScene
+from pick_and_place_rl.video import VideoRecorder
 
 
 def to_base(p_world, base):
@@ -43,6 +44,7 @@ def main():
     ap.add_argument("--max-offset", type=float, nargs=3, default=[0.12, 0.10, 8.0], help="x (m), y (m), yaw (deg)")
     ap.add_argument("--odom", default="/ground_truth_odom", help="sim odometry slips badly at low speed; ground truth stands in for a good one")
     ap.add_argument("--report", default=None)
+    ap.add_argument("--video", default=None, help="mp4 path: records the displaced start, the park and the pick-and-place")
     args = ap.parse_args()
 
     urdf = open(args.urdf).read()
@@ -51,6 +53,7 @@ def main():
     arm = ArmController(sc)
     env = PickPlaceEnv(sc, arm, seed=args.seed)
     env.pin_base = False
+    rec = VideoRecorder(sc, args.video, fps=20) if args.video else None
     rng = np.random.default_rng(args.seed)
     mx, my, myaw = args.max_offset
     rows = []
@@ -65,6 +68,9 @@ def main():
         sc.set_model_pos("tiago", [start[0], start[1], 0.0], start[2])
         sc.sleep(1.0)
         base = BaseDriver(sc, odom=args.odom)
+        if rec:
+            rec.caption = "auto-park from camera"
+            rec.start()
         res = auto_park(sc, base, confirm=lambda t: True, log=lambda s: print("   " + s, flush=True))
         sc.sleep(1.5)
         bx = sc.truth_pose2d("tiago")
@@ -78,12 +84,16 @@ def main():
             sc.detach_object()
             sc.send_gripper(GRIP_OPEN_CMD, 0.6)
             env._arm_ready = False
+            if rec:
+                rec.caption = "pick and place"
             obs = env._reset_real(None)
             info = {}
             for t in range(env.max_steps):
                 obs, done, info = env.step(expert_action(obs))
                 if done:
                     break
+            if rec:
+                rec.stop()
             o_final = sc.truth_pos("pick_object")
             row["pnp_info"] = {k: (bool(v) if isinstance(v, (bool, np.bool_)) else v) for k, v in info.items()}
             row["pnp_closes"] = [[round(c, 4) for c in cl] for cl in env.close_log]
@@ -98,6 +108,8 @@ def main():
         rows.append(row)
         print(f"trial {k + 1}/{args.trials}: start {row['start']} -> end {row['end']} (yaw {row['yaw_end_deg']} deg) "
               f"park_ok={res.ok} it={res.iterations} in_region={in_region} (within 1 cm: {near_region}) {row.get('pnp_success', '')} {res.msg}", flush=True)
+    if rec:
+        rec.stop()
     n_ok = sum(r["ok"] and r["in_region"] for r in rows)
     n_near = sum(r["ok"] and r["near_region"] for r in rows)
     print(f"RESULT: parked inside the trained regions in {n_ok}/{len(rows)} trials ({n_near}/{len(rows)} within 1 cm); "

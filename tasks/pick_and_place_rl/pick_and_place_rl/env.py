@@ -34,6 +34,27 @@ WORKSPACE_HI = np.array([0.72, 0.32, max(1.10, HOVER_Z + 0.05)])
 OBS_DIM = 12
 ACT_DIM = 4
 
+SCENE_MARGIN = 0.03  # m outside the trained regions that the perceived scene may be before we refuse to move
+SCENE_Z_TOL = 0.03  # m: perceived object / pad heights must match the table height this closely
+
+
+def scene_problems(o, p, margin=SCENE_MARGIN, z_tol=SCENE_Z_TOL):
+    """Why the perceived object centre `o` / pad centre `p` (base frame, table-height corrected) cannot be trusted.
+
+    Empty list = plausible. Catches a wrong colour blob, a wrong --table-height or a layout outside what the
+    policy was trained on, before any arm motion.
+    """
+    out = []
+    for name, q, region, z_ref in (("object", o, OBJ_REGION, OBJ_Z), ("pad", p, PAD_REGION, PAD_Z)):
+        (x0, x1), (y0, y1) = region
+        if not (x0 - margin <= q[0] <= x1 + margin and y0 - margin <= q[1] <= y1 + margin):
+            out.append(f"{name} at x={q[0]:.2f} y={q[1]:.2f} is outside the trained region "
+                       f"(x {x0:.2f}..{x1:.2f}, y {y0:.2f}..{y1:.2f}, +-{margin * 100:.0f} cm)")
+        if abs(q[2] - z_ref) > z_tol:
+            out.append(f"{name} height {q[2]:.3f} m is {abs(q[2] - z_ref) * 100:.0f} cm from the expected {z_ref:.3f} m "
+                       "(wrong table height, or the wrong coloured thing was detected)")
+    return out
+
 
 def expert_action(obs: np.ndarray) -> np.ndarray:
     """Reactive scripted expert: a function of the observation only."""
@@ -200,6 +221,9 @@ class PickPlaceEnv:
         if not sc.wait_perception(timeout=30.0):
             raise RuntimeError("perception never saw both the object and the pad")
         sc.sleep(1.0)
+        bad = scene_problems(sc.model_pos(OBJECT_NAME), sc.model_pos(PAD_NAME))
+        if bad:
+            raise RuntimeError("refusing to move, the perceived scene is not plausible: " + "; ".join(bad))
         self.steps = 0
         return self.obs()
 

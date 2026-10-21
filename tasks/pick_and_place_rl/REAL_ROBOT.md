@@ -60,6 +60,11 @@ ros2 topic echo /pick_place/object   # base_footprint frame; compare with a tape
 ros2 topic echo /pick_place/table    # [height, edge distance, edge slope, span, rms, n]
 ```
 
+Perception picks the colour blob whose physical size fits (can cap 3-8 cm, pad 7-24 cm), not simply the largest, and
+`run_real` refuses to move the arm when the perceived object or pad is more than 3 cm outside the trained region or
+3 cm off the expected height (`env.scene_problems`): that is what a wrong `--table-height` or a wrong coloured thing
+looks like. If it refuses, fix that first.
+
 The camera topic names match the ones the rest of this repo uses on the real robot. Depth must be registered to
 the RGB image (same size); both 16UC1 (mm) and 32FC1 (m) are handled. Tape-measure check: place the object at a
 known (x, y) from the base_footprint and compare; the sim error is 0.5 cm, expect more on the real camera.
