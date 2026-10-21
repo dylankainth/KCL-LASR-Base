@@ -68,6 +68,8 @@ def main():
     ap.add_argument("--step-scale", type=float, default=0.4, help="scales the per-step hand displacement")
     ap.add_argument("--max-steps", type=int, default=400)
     ap.add_argument("--report", default="real_run.json")
+    ap.add_argument("--closed-loop", action="store_true",
+                    help="contact + encoder feedback over the policy: grasp retry search, touchdown release, hold on a lost camera [unverified]")
     ap.add_argument("--auto", action="store_true", help="do not prompt between steps of an episode")
     ap.add_argument("--approach-only", action="store_true",
                     help="never close the gripper: stop above the object at grasp height so a person can check alignment")
@@ -99,6 +101,7 @@ def main():
     arm = ArmController(sc, z_offset=sc.z_offset)
     env = PickPlaceEnv(sc, arm, max_steps=args.max_steps, step_scale=args.step_scale)
     env.no_close = args.approach_only
+    env.closed_loop = args.closed_loop
     if args.grip_close is not None:
         env.grip_close_cmd = args.grip_close
     policy = None if args.expert else MLPPolicy.load(args.policy)

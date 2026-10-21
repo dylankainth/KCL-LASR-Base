@@ -12,6 +12,7 @@ replacing them with a detector is future work.
 import numpy as np
 
 from pick_and_place_rl.arm_control import HOVER_Z, ArmController
+from pick_and_place_rl.closed_loop import GraspSearch, HandTracker, touchdown
 from pick_and_place_rl.robot import OBJECT_NAME, PAD_NAME, TiagoScene
 
 GRASP_DZ = 0.06  # hand height above the object's centre when grasping
@@ -35,6 +36,8 @@ OBS_DIM = 12
 ACT_DIM = 4
 
 SCENE_MARGIN = 0.03  # m outside the trained regions that the perceived scene may be before we refuse to move
+TOUCH_STEPS = 3  # consecutive contact steps before the placing release fires
+STALE_HOLD_STEPS = 100  # control steps the arm waits for a lost camera estimate before giving up
 SCENE_Z_TOL = 0.03  # m: perceived object / pad heights must match the table height this closely
 
 
@@ -114,6 +117,7 @@ class PickPlaceEnv:
         self.grip_close_cmd = GRIP_CLOSE_CMD  # finger command when closing (tune on the real gripper)
         self.no_close = False  # approach-only mode: the gripper is never allowed to close
         self.lost_count = 0
+        self.search_exhausted = False
         self.close_log = []  # sim only: true (object - hand) error at each close command
         self.step_scale = step_scale  # < 1 slows the hand down (real robot first trials)
         self.obs_noise = obs_noise  # PerceptionNoise or None (sim: corrupts what the policy sees)
@@ -125,6 +129,11 @@ class PickPlaceEnv:
         self.base_resets = 0
         self._stall = 0  # consecutive steps the commanded target was far from the hand (real robot watchdog)
         self._stall_ref = None
+        self.closed_loop = False  # real robot: encoder PI, grasp retry search, touchdown release, stale-camera hold
+        self.tracker = HandTracker()
+        self.search = GraspSearch()
+        self._touch = 0
+        self._stale = 0
         self.pin_base = True  # sim: teleport the base back to the origin if it drifts (off when the robot parks itself)
         self.sc.detach_object()  # drop any joint left over from a previous run
         self.sc.sleep(0.2)
@@ -150,9 +159,16 @@ class PickPlaceEnv:
         pad_xy = self._uniform(PAD_REGION)
         return obj_xy, pad_xy
 
+    def object_pos(self) -> np.ndarray:
+        """Perceived object position, plus the closed-loop correction while it is not in the gripper."""
+        o = self.sc.model_pos(OBJECT_NAME)
+        if self.closed_loop and not self.attached:
+            o = o + self.search.offset
+        return o
+
     def clean_obs(self) -> np.ndarray:
         h = self.arm.hand_pos()
-        o = self.sc.model_pos(OBJECT_NAME)
+        o = self.object_pos()
         p = self.sc.model_pos(PAD_NAME)
         return np.array(
             [*h, *(o - h), *(p - h), self.sc.gripper_opening(), float(self.grip_cmd), float(self.attached)]
@@ -221,11 +237,42 @@ class PickPlaceEnv:
         if not sc.wait_perception(timeout=30.0):
             raise RuntimeError("perception never saw both the object and the pad")
         sc.sleep(1.0)
+        self.tracker.reset()
+        self.search.new_episode()
+        self._touch = self._stale = 0
+        self.search_exhausted = False
         bad = scene_problems(sc.model_pos(OBJECT_NAME), sc.model_pos(PAD_NAME))
         if bad:
             raise RuntimeError("refusing to move, the perceived scene is not plausible: " + "; ".join(bad))
         self.steps = 0
         return self.obs()
+
+    def _closed_loop_action(self, action):
+        """Contact and freshness feedback over the policy's action: hold on a lost camera, release on touchdown."""
+        sc, arm = self.sc, self.arm
+        action = action.copy()
+        if sc.perception_stale(OBJECT_NAME) or sc.perception_stale(PAD_NAME):
+            self._stale += 1
+            if self._stale > STALE_HOLD_STEPS:
+                raise RuntimeError("the camera lost the object or the pad for too long; holding the arm")
+            action[:3] = 0.0
+            return action
+        self._stale = 0
+        if self.attached and action[2] < 0.0:
+            p = sc.model_pos(PAD_NAME)
+            h, cmd = arm.hand_pos(), arm.cmd_hand_pos()
+            near = np.linalg.norm(p[:2] - h[:2]) < 0.02 and h[2] - (p[2] + 0.05 + GRASP_DZ) < 0.03
+            if near and touchdown(cmd[2], h[2], action[2]):
+                self._touch += 1
+            else:
+                self._touch = 0
+            if self._touch >= TOUCH_STEPS:
+                print("  touchdown on the pad: releasing", flush=True)
+                action[:3] = 0.0
+                action[3] = 0.0
+        else:
+            self._touch = 0
+        return action
 
     def _check_following(self, target, far=0.02, steps=50, still=0.004):
         """Real robot: abort if the hand stays put while the command is far from it (controller rejected or
@@ -250,8 +297,13 @@ class PickPlaceEnv:
     def step(self, action):
         sc, arm = self.sc, self.arm
         action = np.asarray(action, float)
+        if self.closed_loop and not sc.sim:
+            action = self._closed_loop_action(action)
         delta = np.clip(action[:3], -MAX_STEP, MAX_STEP) * self.step_scale
         target = np.clip(arm.cmd_hand_pos() + delta, WORKSPACE_LO, WORKSPACE_HI)
+        if self.closed_loop and not sc.sim:
+            hold = bool(action[3] > 0.5) != self.grip_cmd or self._touch > 0
+            target = np.clip(target + self.tracker.correction(arm.cmd_hand_pos(), arm.hand_pos(), hold), WORKSPACE_LO, WORKSPACE_HI)
         if not sc.sim:  # real arm: never let the command run more than 4 cm ahead of the measured hand
             lead = target - arm.hand_pos()
             n = np.linalg.norm(lead)
@@ -272,13 +324,16 @@ class PickPlaceEnv:
         if not sc.sim:
             self._check_following(target)
 
-        o = sc.model_pos(OBJECT_NAME)
+        o = self.object_pos()
         h = arm.hand_pos()
         ot = sc.truth_pos(OBJECT_NAME) if sc.sim else o  # success is judged on ground truth in sim
         if self.grip_cmd and not self.attached and sc.gripper_opening() <= CLOSED_ON_OBJ:
             if np.linalg.norm((o - h) - np.array([0, 0, -GRASP_DZ])) < 0.03:
                 sc.attach_object()
                 self.attached = True
+                if self.closed_loop and not sc.sim:
+                    b = self.search.grasped()
+                    print(f"  grasp held; standing object correction now {b.round(3)} m", flush=True)
         elif (not self.grip_cmd) and self.attached:
             sc.detach_object()
             self.attached = False
@@ -292,10 +347,18 @@ class PickPlaceEnv:
             sc.unlatch_object()
             self.lost_count += 1
 
+        if self.closed_loop and not sc.sim and self.grip_cmd and not self.attached and sc.gripper_opening() < LOST_OPENING:
+            # the fingers met: nothing was between them. Reopen and try the next point of the search spiral.
+            retry = self.search.missed()
+            print(f"  grasp closed on nothing; {'retrying at the next search point' if retry else 'search exhausted'}", flush=True)
+            self.grip_cmd = False
+            sc.send_gripper(GRIP_OPEN_CMD, 0.6)
+            self.search_exhausted = not retry
+
         self.steps += 1
         pt = sc.truth_pos(PAD_NAME) if sc.sim else sc.model_pos(PAD_NAME)
         on_pad = np.linalg.norm(ot[:2] - pt[:2]) < PLACE_TOL and ot[2] < OBJ_Z + 0.03
         success = on_pad and (not self.attached) and (not self.grip_cmd) and h[2] > HOVER_Z - 0.03
         fell = ot[2] < 0.80 or np.linalg.norm(ot[:2] - np.array([0.63, 0.0])) > 0.7
-        done = success or fell or self.steps >= self.max_steps
+        done = success or fell or self.steps >= self.max_steps or self.search_exhausted
         return self.obs(), done, {"success": bool(success), "fell": bool(fell), "steps": self.steps}

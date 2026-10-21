@@ -65,6 +65,26 @@ Perception picks the colour blob whose physical size fits (can cap 3-8 cm, pad 7
 3 cm off the expected height (`env.scene_problems`): that is what a wrong `--table-height` or a wrong coloured thing
 looks like. If it refuses, fix that first.
 
+### Closed-loop mode (`--closed-loop`, off by default) **[unverified]**
+
+The camera and the joint encoders disagree by a roughly constant amount (head tilt, table height, calibration), and no
+controller that only sees that disagreement can remove it. `--closed-loop` therefore closes on things that see the hand
+and the object together:
+
+* **Grasp retry:** if the fingers close below `LOST_OPENING` with nothing attached, the gripper reopens and the object
+  estimate is shifted along a spiral (8 points at 1 cm, 8 at 2 cm). The offset that finally grips is kept as a standing
+  correction (max 3 cm) for the following episodes. After the spiral the episode ends. The hand slides sideways at grasp
+  height between tries, so keep `--step-scale` low.
+* **Touchdown release:** while carrying and descending over the pad, the object is released when the hand stays >1 cm
+  above its command for 3 steps, and only within 3 cm of the expected place height and 2 cm of the pad in xy.
+* **Encoder PI:** a bounded integral (max 1.5 cm) of commanded minus measured hand position, frozen during fast moves,
+  contact and gripper changes, removes arm sag and lag.
+* **Stale camera:** the arm holds still if no object/pad estimate has been accepted for 3 s while the hand is not what
+  hides it, and aborts after 10 s.
+
+Check in this order, arm over the object, `--approach-only` first: does the PI settle without oscillating, does a
+deliberate 1.5 cm `--calib` error get found by the retry search, does touchdown fire at the pad and never in mid-air.
+
 The camera topic names match the ones the rest of this repo uses on the real robot. Depth must be registered to
 the RGB image (same size); both 16UC1 (mm) and 32FC1 (m) are handled. Tape-measure check: place the object at a
 known (x, y) from the base_footprint and compare; the sim error is 0.5 cm, expect more on the real camera.

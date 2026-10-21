@@ -106,6 +106,11 @@ Remaining sensitivity (these are systematic, `calibrate.py` removes a constant o
 ~1.2 cm table-height error and ~0.8 cm object error; 4 px depth/RGB misregistration ~0.6 cm. The table-edge distance
 has ~0.9 cm stride-quantisation bias (depth subsampled by 3), harmless for parking (2 cm margin).
 `python3 -m unittest discover -s test` runs the offline regression tests.
+
+### Closed-loop mode
+
+`run_real --closed-loop` adds contact and encoder feedback over the policy (`closed_loop.py`, see `REAL_ROBOT.md`). The
+unit tests cover the controllers and the `env` hooks against a fake scene; none of it has run on Gazebo or hardware.
 The extra DAgger round with noisy observations (`policy_noise_dagger.npz`) did **not** help, so `policy.npz` stays
 the default. The expert is no better than the policy under this noise, so the noise level, not the network, is
 what limits success; the numbers are within the spread expected from 30 episodes. Results files are in `results/`.

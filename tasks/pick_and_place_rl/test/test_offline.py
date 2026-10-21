@@ -119,5 +119,110 @@ class SceneGateTests(unittest.TestCase):
         self.assertIn("object", bad[0])
 
 
+class ClosedLoopTests(unittest.TestCase):
+    def test_tracker_removes_steady_droop_and_is_bounded(self):
+        from pick_and_place_rl.closed_loop import HandTracker
+
+        t = HandTracker()
+        cmd, hand = np.array([0.6, 0.0, 1.0]), np.array([0.6, 0.0, 0.994])  # 6 mm sag
+        for _ in range(40):
+            c = t.correction(cmd, hand)
+            hand = cmd + np.array([0, 0, -0.006]) + c  # the arm still sags, but we now ask for more
+        self.assertLess(abs(hand[2] - cmd[2]), 0.001)
+        far = HandTracker()
+        for _ in range(100):
+            far.correction(cmd, cmd - np.array([0, 0, 0.05]))  # not following: must not wind up
+        self.assertEqual(float(np.abs(far.i).max()), 0.0)
+        held = HandTracker()
+        for _ in range(100):
+            held.correction(cmd, cmd - np.array([0, 0, 0.005]), hold=True)
+        self.assertEqual(float(np.abs(held.i).max()), 0.0)
+
+    def test_search_visits_a_spiral_then_gives_up(self):
+        from pick_and_place_rl.closed_loop import GraspSearch
+
+        g = GraspSearch()
+        self.assertEqual(g.offset.tolist(), [0.0, 0.0, 0.0])
+        seen = [g.offset[:2].copy()]
+        while g.missed():
+            seen.append(g.offset[:2].copy())
+        self.assertEqual(len(seen), 1 + 8 * 2)
+        self.assertAlmostEqual(max(np.linalg.norm(s) for s in seen), 0.02)
+
+    def test_working_offset_becomes_standing_correction(self):
+        from pick_and_place_rl.closed_loop import GraspSearch
+
+        g = GraspSearch()
+        g.missed()
+        off = g.offset[:2].copy()
+        b = g.grasped()
+        np.testing.assert_allclose(b, off)
+        np.testing.assert_allclose(g.offset[:2], off)  # next episode starts from the learnt correction
+        self.assertTrue(g.k == 0)
+
+    def test_bias_is_clamped(self):
+        from pick_and_place_rl.closed_loop import GraspSearch
+
+        g = GraspSearch()
+        for _ in range(10):
+            g.k = 1 + 0  # ring point at +x, 1 cm
+            g.grasped()
+        self.assertLessEqual(float(np.abs(g.bias).max()), 0.03 + 1e-12)
+
+    def test_touchdown_needs_a_downward_command_below_the_hand(self):
+        from pick_and_place_rl.closed_loop import touchdown
+
+        self.assertTrue(touchdown(0.80, 0.82, -0.005))
+        self.assertFalse(touchdown(0.80, 0.805, -0.005))  # ordinary tracking lag
+        self.assertFalse(touchdown(0.80, 0.82, 0.005))  # moving up
+
+
+class ClosedLoopEnvTests(unittest.TestCase):
+    """env._closed_loop_action against a fake scene/arm (the ROS parts are not exercised)."""
+
+    @classmethod
+    def setUpClass(cls):
+        _stub_ros_modules()
+        from pick_and_place_rl import env
+
+        cls.env = env
+
+    def make(self, hand_z, cmd_z, stale=False, attached=True):
+        e = self.env
+        o = object.__new__(e.PickPlaceEnv)
+        pad = np.array([0.63, -0.2, e.PAD_Z])
+        o.sc = types.SimpleNamespace(
+            perception_stale=lambda name, **k: stale, model_pos=lambda name: pad.copy()
+        )
+        hand = np.array([0.63, -0.2, hand_z])
+        cmd = np.array([0.63, -0.2, cmd_z])
+        o.arm = types.SimpleNamespace(hand_pos=lambda: hand, cmd_hand_pos=lambda: cmd)
+        o.attached, o._touch, o._stale = attached, 0, 0
+        return o
+
+    def test_stale_camera_holds_then_gives_up(self):
+        o = self.make(1.0, 1.0, stale=True)
+        a = o._closed_loop_action(np.array([0.01, 0.01, -0.01, 1.0]))
+        self.assertEqual(a[:3].tolist(), [0, 0, 0])
+        o._stale = self.env.STALE_HOLD_STEPS
+        with self.assertRaises(RuntimeError):
+            o._closed_loop_action(np.array([0.0, 0.0, 0.0, 1.0]))
+
+    def test_touchdown_releases_only_after_sustained_contact_near_the_pad(self):
+        e = self.env
+        place_z = e.PAD_Z + 0.05 + e.GRASP_DZ
+        o = self.make(place_z + 0.01, place_z - 0.01)  # hand blocked 2 cm above its command, near place height
+        down = np.array([0.0, 0.0, -0.005, 1.0])
+        for _ in range(e.TOUCH_STEPS - 1):
+            self.assertEqual(o._closed_loop_action(down)[3], 1.0)
+        self.assertEqual(o._closed_loop_action(down)[3], 0.0)
+
+    def test_no_release_high_above_the_pad_even_with_lag(self):
+        e = self.env
+        o = self.make(1.0, 0.97)  # 3 cm lag but 15 cm above the place height: that is just a fast descent
+        for _ in range(10):
+            self.assertEqual(o._closed_loop_action(np.array([0.0, 0.0, -0.005, 1.0]))[3], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

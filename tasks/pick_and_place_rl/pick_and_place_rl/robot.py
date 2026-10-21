@@ -270,6 +270,23 @@ class TiagoScene:
             time.sleep(0.1)
         return False
 
+    def perception_stale(self, name: str, max_age: float = 3.0) -> bool:
+        """Real robot: no accepted estimate of `name` for `max_age` s although the hand is not what hides it."""
+        if self.sim or not self.use_perception:
+            return False
+        with self._lock:
+            age = time.time() - self._est_time.get(name, -1e9)
+            ref = self._perc.get(name)
+            have_q = all(j in self._joints for j in CHAIN_JOINTS)
+            q = np.array([self._joints[j] for j in CHAIN_JOINTS]) if have_q else None
+        if age < max_age:
+            return False
+        if ref is not None and q is not None:
+            hand = self.chain.fk(q)[:3, 3]
+            if np.linalg.norm(hand[:2] - ref[:2]) < OCCLUSION_RADIUS and hand[2] < OCCLUSION_HEIGHT:
+                return False  # the hand is in the way: the latched estimate is the best there is
+        return True
+
     def unlatch_pad(self):
         with self._lock:
             self._perc.pop(PAD_NAME, None)
