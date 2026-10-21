@@ -2,7 +2,7 @@
 
 Imitation-learned (BC + DART + DAgger; **no RL**) TIAGo tabletop pick-and-place: pick a blue 5×10 cm cylinder, place on a red pad.
 Developed in Gazebo; the real-robot path (`run_real`) is **written but has never touched hardware**. Keep that distinction in every claim you make.
-User-facing docs: `README.md` (design + results), `REAL_ROBOT.md` (commissioning runbook). Read them before changing behaviour.
+User-facing docs: `README.md` (design + results), `REAL_ROBOT.md` (commissioning runbook), `LAPTOP_SETUP.md` (getting the uni laptop's WSL connected to the real robot; read it if asked to set up or connect to TIAGo). Read them before changing behaviour.
 
 ## Not a YASMIN task
 Plain python modules run as `python3 -m pick_and_place_rl.<module>` (no `console_scripts`). Package is `ament_python`, deps: rclpy, gazebo_msgs, control_msgs, trajectory_msgs, `simulation`.
