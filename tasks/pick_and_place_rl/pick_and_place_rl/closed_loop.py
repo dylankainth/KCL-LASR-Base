@@ -7,10 +7,14 @@ hand and the object together:
   HandTracker  encoder PI: the measured hand follows the commanded one (gravity droop, controller lag)
   GraspSearch  contact: a close that finds nothing retries on a small spiral; the offset that finally grips becomes
                a standing correction to the object estimate for the next episodes
-  touchdown    contact: the hand stops following a downward command, so it is on the pad / table
+  touchdown    contact: the hand has stopped although it is commanded down, so it rests on the pad / table
+
+FingerSettle  the finger opening has stopped changing, so the grasp can be judged
 
 Enabled with `env.closed_loop = True` (run_real --closed-loop). Everything is [unverified] on hardware.
 """
+
+from collections import deque
 
 import numpy as np
 
@@ -21,7 +25,11 @@ TRACK_LEAK = 0.98  # per step, so a stale correction fades
 SEARCH_RINGS = (0.010, 0.020)  # m, radii of the retry spiral around the believed object position
 SEARCH_POINTS = 8  # retry points per ring
 BIAS_LIMIT = 0.03  # m, the standing object correction never exceeds this
-TOUCH_GAP = 0.010  # m, a downward command this far below the measured hand means contact
+SETTLE_STEPS = 3  # control steps of finger readings that must agree before a grasp is judged
+SETTLE_TOL = 0.0006  # m, largest spread of those readings that still counts as 'the fingers stopped'
+TOUCH_GAP = 0.004  # m, the hand is this far above a downward command ...
+TOUCH_STILL = 0.001  # m, ... and has moved less than this over the last TOUCH_WINDOW steps: it is resting on something
+TOUCH_WINDOW = 3  # control steps of hand height kept for that test
 
 
 class HandTracker:
@@ -42,6 +50,24 @@ class HandTracker:
         return self.i.copy()
 
 
+class FingerSettle:
+    """Has the finger opening stopped changing? A close sweeps through the object's width on its way to the command
+    value when nothing is in the way, so a grasp may only be judged once the fingers have stopped."""
+
+    def __init__(self, steps=SETTLE_STEPS, tol=SETTLE_TOL):
+        self.hist = deque(maxlen=steps)
+        self.tol = tol
+
+    def clear(self):
+        self.hist.clear()
+
+    def push(self, opening):
+        self.hist.append(float(opening))
+
+    def settled(self) -> bool:
+        return len(self.hist) == self.hist.maxlen and max(self.hist) - min(self.hist) < self.tol
+
+
 class GraspSearch:
     """Retry offsets after a grasp that closed on nothing, and the correction learnt from a grasp that worked."""
 
@@ -51,6 +77,7 @@ class GraspSearch:
         self.bias_limit = bias_limit
         self.bias = np.zeros(2)  # standing correction added to every object estimate (xy, base frame)
         self.k = 0  # index into offsets for the current attempt
+        self.misses = 0  # total missed grasps (statistics)
 
     @property
     def offset(self) -> np.ndarray:
@@ -62,6 +89,7 @@ class GraspSearch:
 
     def missed(self) -> bool:
         """The fingers closed on nothing. Move to the next retry point; False when the spiral is used up."""
+        self.misses += 1
         if self.k + 1 >= len(self.offsets):
             return False
         self.k += 1
@@ -74,6 +102,7 @@ class GraspSearch:
         return self.bias.copy()
 
 
-def touchdown(cmd_z, hand_z, dz_cmd, gap=TOUCH_GAP) -> bool:
-    """True when the command is `gap` below the measured hand while still being driven down."""
-    return dz_cmd < 0.0 and (cmd_z - hand_z) < -gap
+def touchdown(cmd_z, hand_z, dz_cmd, moved, gap=TOUCH_GAP, still=TOUCH_STILL) -> bool:
+    """True when the hand has stopped (`moved` = its height range over the last few steps) although the command is
+    still `gap` below it and being driven down. Lag alone does not qualify: a hand that follows moves."""
+    return dz_cmd < 0.0 and (hand_z - cmd_z) > gap and moved < still

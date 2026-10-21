@@ -258,22 +258,30 @@ class TiagoScene:
             time.sleep(0.2)
         raise TimeoutError("TIAGo not ready (joint_states / model_states / services)")
 
-    def wait_perception(self, timeout: float = 30.0, max_age: float = 1.5):
-        """Real robot: block until fresh object and pad estimates exist."""
+    def wait_perception(self, timeout: float = 30.0, max_age: float = 1.5, names=(OBJECT_NAME, PAD_NAME)):
+        """Real robot: block until fresh estimates of `names` (default the object and the pad) exist."""
         t0 = time.time()
         while time.time() - t0 < timeout:
             now = time.time()
             with self._lock:
-                ok = all(now - self._est_time.get(n, -1e9) < max_age for n in (OBJECT_NAME, PAD_NAME))
+                ok = all(now - self._est_time.get(n, -1e9) < max_age for n in names)
             if ok:
                 return True
             time.sleep(0.1)
         return False
 
+    def perception_ages(self) -> dict:
+        """Seconds since each estimate was last accepted (diagnostics)."""
+        now = time.time()
+        with self._lock:
+            return {n: round(now - self._est_time.get(n, -1e9), 1) for n in (OBJECT_NAME, PAD_NAME)}
+
     def perception_stale(self, name: str, max_age: float = 3.0) -> bool:
         """Real robot: no accepted estimate of `name` for `max_age` s although the hand is not what hides it."""
         if self.sim or not self.use_perception:
             return False
+        if name == OBJECT_NAME and self.carrying:
+            return False  # the object estimate is deliberately frozen while it is in the gripper
         with self._lock:
             age = time.time() - self._est_time.get(name, -1e9)
             ref = self._perc.get(name)

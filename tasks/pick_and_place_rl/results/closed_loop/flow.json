@@ -1,0 +1,89 @@
+{
+ "scenario": "flow",
+ "args": {
+  "scenario": "flow",
+  "urdf": "/ros_ws/scratch/tiago.urdf",
+  "closed_loop": false,
+  "both": false,
+  "biases": [
+   "0,0",
+   "0.02,0"
+  ],
+  "reps": 1,
+  "closes": [
+   0.0245,
+   0.016
+  ],
+  "grip_close": null,
+  "speed_scale": 0.3,
+  "step_scale": 0.4,
+  "max_steps": 1500,
+  "sag": 0.012,
+  "tol_x": 0.015,
+  "tol_y": 0.02,
+  "episodes": 2,
+  "debug_steps": 60,
+  "pad_biases": [
+   -0.012,
+   -0.005,
+   0.0,
+   0.008,
+   0.012,
+   0.02
+  ],
+  "z_contact": 0.945,
+  "pause_for": 6.0,
+  "report": "/ros_ws/data/cl_flow.json"
+ },
+ "results": [
+  {
+   "scenario": "flow",
+   "results": [
+    {
+     "bias_cm": [
+      0.0,
+      0.0
+     ],
+     "gripped_at_step": 75,
+     "released_at_step": 191,
+     "misses": 0,
+     "touchdown_releases": 0,
+     "stale_holds": 0,
+     "error": null,
+     "seconds": 24.1,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "final_hand": [
+      0.619,
+      -0.197,
+      0.934
+     ]
+    },
+    {
+     "bias_cm": [
+      2.0,
+      0.0
+     ],
+     "gripped_at_step": 377,
+     "released_at_step": 498,
+     "misses": 4,
+     "touchdown_releases": 0,
+     "stale_holds": 0,
+     "error": null,
+     "seconds": 86.2,
+     "learnt_bias_cm": [
+      -0.71,
+      0.71
+     ],
+     "final_hand": [
+      0.619,
+      -0.197,
+      0.931
+     ]
+    }
+   ]
+  }
+ ]
+}

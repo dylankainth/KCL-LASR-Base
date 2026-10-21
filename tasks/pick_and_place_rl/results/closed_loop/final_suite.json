@@ -1,0 +1,827 @@
+{
+ "scenario": "track,stale,carry,touch_emul,learn",
+ "args": {
+  "scenario": "track,stale,carry,touch_emul,learn",
+  "urdf": "/ros_ws/scratch/tiago.urdf",
+  "closed_loop": false,
+  "both": false,
+  "biases": [
+   "0,0",
+   "0.02,0",
+   "0,0.03"
+  ],
+  "reps": 1,
+  "closes": [
+   0.0245,
+   0.016
+  ],
+  "grip_close": null,
+  "speed_scale": 0.3,
+  "step_scale": 0.4,
+  "max_steps": 2500,
+  "sag": 0.012,
+  "tol_x": 0.015,
+  "tol_y": 0.02,
+  "episodes": 2,
+  "debug_steps": 60,
+  "pad_biases": [
+   -0.012,
+   0.0035,
+   0.008,
+   0.02
+  ],
+  "z_contact": 0.945,
+  "pause_for": 6.0,
+  "report": "/ros_ws/data/cl_final2.json"
+ },
+ "results": [
+  {
+   "scenario": "track",
+   "results": [
+    {
+     "closed_loop": false,
+     "sag_rad": 0.012,
+     "steps": 64,
+     "median_err_mm": 6.49,
+     "p95_err_mm": 9.3,
+     "max_corr_mm": 0.0,
+     "trace": [
+      [
+       0,
+       [
+        0.6205,
+        -0.0447,
+        1.0451
+       ],
+       [
+        0.6205,
+        -0.048,
+        1.0486
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       6,
+       [
+        0.6202,
+        -0.0153,
+        1.045
+       ],
+       [
+        0.6203,
+        -0.0197,
+        1.0484
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       12,
+       [
+        0.6201,
+        0.0138,
+        1.0451
+       ],
+       [
+        0.6202,
+        0.0087,
+        1.0485
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       18,
+       [
+        0.62,
+        0.0427,
+        1.0451
+       ],
+       [
+        0.6202,
+        0.0375,
+        1.0485
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       24,
+       [
+        0.6199,
+        0.0714,
+        1.0451
+       ],
+       [
+        0.6201,
+        0.0676,
+        1.0486
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       30,
+       [
+        0.6198,
+        0.0998,
+        1.045
+       ],
+       [
+        0.62,
+        0.0954,
+        1.0486
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       36,
+       [
+        0.6197,
+        0.1278,
+        1.045
+       ],
+       [
+        0.6198,
+        0.1232,
+        1.0486
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       42,
+       [
+        0.6197,
+        0.1501,
+        1.0294
+       ],
+       [
+        0.6199,
+        0.1481,
+        1.0384
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       48,
+       [
+        0.6195,
+        0.1492,
+        0.9988
+       ],
+       [
+        0.6202,
+        0.1492,
+        1.0071
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       54,
+       [
+        0.6192,
+        0.1493,
+        0.9687
+       ],
+       [
+        0.6202,
+        0.1489,
+        0.977
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ],
+      [
+       60,
+       [
+        0.6189,
+        0.1493,
+        0.9392
+       ],
+       [
+        0.6202,
+        0.1489,
+        0.9476
+       ],
+       [
+        0.0,
+        0.0,
+        0.0
+       ]
+      ]
+     ]
+    },
+    {
+     "closed_loop": true,
+     "sag_rad": 0.012,
+     "steps": 64,
+     "median_err_mm": 1.4,
+     "p95_err_mm": 4.01,
+     "max_corr_mm": 7.3,
+     "trace": [
+      [
+       0,
+       [
+        0.6203,
+        -0.0447,
+        1.045
+       ],
+       [
+        0.6203,
+        -0.0467,
+        1.0488
+       ],
+       [
+        -0.0,
+        0.0,
+        -0.0005
+       ]
+      ],
+      [
+       6,
+       [
+        0.6204,
+        -0.013,
+        1.0444
+       ],
+       [
+        0.6205,
+        -0.0173,
+        1.0477
+       ],
+       [
+        -0.0001,
+        0.0025,
+        -0.0023
+       ]
+      ],
+      [
+       12,
+       [
+        0.6204,
+        0.0168,
+        1.0449
+       ],
+       [
+        0.6205,
+        0.0127,
+        1.0484
+       ],
+       [
+        -0.0001,
+        0.0031,
+        -0.0028
+       ]
+      ],
+      [
+       18,
+       [
+        0.6203,
+        0.0459,
+        1.045
+       ],
+       [
+        0.6204,
+        0.0415,
+        1.0485
+       ],
+       [
+        -0.0001,
+        0.0034,
+        -0.0029
+       ]
+      ],
+      [
+       24,
+       [
+        0.6201,
+        0.0751,
+        1.045
+       ],
+       [
+        0.6203,
+        0.0709,
+        1.0485
+       ],
+       [
+        -0.0001,
+        0.0039,
+        -0.003
+       ]
+      ],
+      [
+       30,
+       [
+        0.62,
+        0.1031,
+        1.045
+       ],
+       [
+        0.6202,
+        0.0985,
+        1.0486
+       ],
+       [
+        -0.0001,
+        0.0036,
+        -0.0031
+       ]
+      ],
+      [
+       36,
+       [
+        0.6199,
+        0.1308,
+        1.0449
+       ],
+       [
+        0.62,
+        0.129,
+        1.0486
+       ],
+       [
+        -0.0001,
+        0.0032,
+        -0.0032
+       ]
+      ],
+      [
+       42,
+       [
+        0.6199,
+        0.1515,
+        1.0285
+       ],
+       [
+        0.6202,
+        0.151,
+        1.0352
+       ],
+       [
+        -0.0001,
+        0.0028,
+        -0.0041
+       ]
+      ],
+      [
+       48,
+       [
+        0.6197,
+        0.1495,
+        0.9967
+       ],
+       [
+        0.6203,
+        0.1492,
+        1.004
+       ],
+       [
+        -0.0003,
+        0.001,
+        -0.0054
+       ]
+      ],
+      [
+       54,
+       [
+        0.6193,
+        0.1502,
+        0.9658
+       ],
+       [
+        0.6203,
+        0.1498,
+        0.9738
+       ],
+       [
+        -0.0006,
+        0.0005,
+        -0.0063
+       ]
+      ],
+      [
+       60,
+       [
+        0.6189,
+        0.1503,
+        0.9354
+       ],
+       [
+        0.6203,
+        0.1499,
+        0.9438
+       ],
+       [
+        -0.0009,
+        0.0004,
+        -0.0073
+       ]
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "scenario": "stale",
+   "results": [
+    {
+     "case": "pause_then_resume",
+     "hand_at_pause": [
+      0.625,
+      -0.013,
+      1.048
+     ],
+     "hold_steps": 27,
+     "max_stale_counter": 27,
+     "hand_moved_during_hold_cm": 0.2,
+     "resumed_at_s": 6.1,
+     "aborted": null,
+     "final_hand": [
+      0.625,
+      0.149,
+      0.938
+     ],
+     "hand_moved_after_resume_cm": 11.83
+    },
+    {
+     "case": "pause_forever",
+     "hand_at_pause": [
+      0.62,
+      -0.012,
+      1.048
+     ],
+     "hold_steps": 100,
+     "max_stale_counter": 100,
+     "hand_moved_during_hold_cm": 0.1,
+     "resumed_at_s": null,
+     "aborted": {
+      "after_s": 15.2,
+      "msg": "the camera lost the object or the pad for too long; holding the arm"
+     },
+     "final_hand": [
+      0.62,
+      0.108,
+      1.049
+     ],
+     "hand_moved_after_resume_cm": 0.06
+    },
+    {
+     "case": "hand_over_can",
+     "hand_at_pause": [
+      0.62,
+      0.149,
+      0.999
+     ],
+     "hold_steps": 0,
+     "max_stale_counter": 0,
+     "hand_moved_during_hold_cm": null,
+     "resumed_at_s": null,
+     "aborted": {
+      "after_s": 32.2,
+      "msg": "after a missed grasp the camera could not find the object again (hand at / estimate age s: [([0.62, -0.05], {'pick_object': 2792583369.5, 'place_pad': 17.6}), ([0.62, 0.32], {'pick_object': 2792583384.2, 'place_pad': 32.3})])"
+     },
+     "final_hand": [
+      0.62,
+      0.32,
+      1.049
+     ],
+     "hand_moved_after_resume_cm": null
+    }
+   ]
+  },
+  {
+   "scenario": "carry",
+   "results": [
+    {
+     "released_at_step": 97,
+     "seconds": 12.4,
+     "stale_holds": 0,
+     "error": null,
+     "final_hand": [
+      0.619,
+      -0.197,
+      0.932
+     ]
+    }
+   ]
+  },
+  {
+   "scenario": "touch_emul",
+   "results": [
+    {
+     "pad_bias_cm": -1.2,
+     "place_z": 0.92,
+     "blocked_above_place_mm": 25.0,
+     "released": {
+      "step": 24,
+      "hand_z": 0.945,
+      "cmd_z": 0.9296
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 0.4,
+     "place_z": 0.9355,
+     "blocked_above_place_mm": 9.5,
+     "released": {
+      "step": 25,
+      "hand_z": 0.9449,
+      "cmd_z": 0.9261
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.9449
+    },
+    {
+     "pad_bias_cm": 0.8,
+     "place_z": 0.94,
+     "blocked_above_place_mm": 5.0,
+     "released": {
+      "step": 21,
+      "hand_z": 0.945,
+      "cmd_z": 0.9356
+     },
+     "touchdown_releases": 0,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 2.0,
+     "place_z": 0.952,
+     "blocked_above_place_mm": -7.0,
+     "released": {
+      "step": 18,
+      "hand_z": 0.9529,
+      "cmd_z": 0.9499
+     },
+     "touchdown_releases": 0,
+     "lowest_hand_z": 0.9529
+    }
+   ]
+  },
+  {
+   "scenario": "learn",
+   "results": [
+    {
+     "bias_cm": [
+      0.0,
+      0.0
+     ],
+     "closed_loop": false,
+     "episode": 0,
+     "believed_gripped": true,
+     "really_gripped": true,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 76,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 13.4,
+     "can_truth": [
+      0.62,
+      0.15,
+      0.864
+     ]
+    },
+    {
+     "bias_cm": [
+      0.0,
+      0.0
+     ],
+     "closed_loop": true,
+     "episode": 0,
+     "believed_gripped": true,
+     "really_gripped": true,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 74,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 15.3,
+     "can_truth": [
+      0.621,
+      0.15,
+      0.865
+     ]
+    },
+    {
+     "bias_cm": [
+      0.0,
+      0.0
+     ],
+     "closed_loop": true,
+     "episode": 1,
+     "believed_gripped": true,
+     "really_gripped": true,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 73,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 15.0,
+     "can_truth": [
+      0.622,
+      0.146,
+      0.865
+     ]
+    },
+    {
+     "bias_cm": [
+      2.0,
+      0.0
+     ],
+     "closed_loop": false,
+     "episode": 0,
+     "believed_gripped": true,
+     "really_gripped": false,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 76,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 14.9,
+     "can_truth": [
+      0.621,
+      0.153,
+      0.865
+     ]
+    },
+    {
+     "bias_cm": [
+      2.0,
+      0.0
+     ],
+     "closed_loop": true,
+     "episode": 0,
+     "believed_gripped": true,
+     "really_gripped": true,
+     "misses": 4,
+     "exhausted": false,
+     "error": null,
+     "steps": 380,
+     "learnt_bias_cm": [
+      -0.71,
+      0.71
+     ],
+     "stale_holds": 0,
+     "seconds": 76.6,
+     "can_truth": [
+      0.604,
+      0.177,
+      0.865
+     ]
+    },
+    {
+     "bias_cm": [
+      2.0,
+      0.0
+     ],
+     "closed_loop": true,
+     "episode": 1,
+     "believed_gripped": true,
+     "really_gripped": true,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 76,
+     "learnt_bias_cm": [
+      -0.71,
+      0.71
+     ],
+     "stale_holds": 0,
+     "seconds": 15.7,
+     "can_truth": [
+      0.623,
+      0.156,
+      0.865
+     ]
+    },
+    {
+     "bias_cm": [
+      0.0,
+      3.0
+     ],
+     "closed_loop": false,
+     "episode": 0,
+     "believed_gripped": true,
+     "really_gripped": false,
+     "misses": 0,
+     "exhausted": false,
+     "error": null,
+     "steps": 82,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 16.0,
+     "can_truth": [
+      0.547,
+      0.131,
+      0.839
+     ]
+    },
+    {
+     "bias_cm": [
+      0.0,
+      3.0
+     ],
+     "closed_loop": true,
+     "episode": 0,
+     "believed_gripped": false,
+     "really_gripped": false,
+     "misses": 1,
+     "exhausted": false,
+     "error": "after a missed grasp the camera could not find the object again (hand at / estimate age s: [([0.62, -0.02], {'pick_object': 2792583651.1, 'place_pad': 0.0})])",
+     "steps": 80,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 31.0,
+     "can_truth": [
+      0.497,
+      0.113,
+      0.054
+     ]
+    },
+    {
+     "bias_cm": [
+      0.0,
+      3.0
+     ],
+     "closed_loop": true,
+     "episode": 1,
+     "believed_gripped": false,
+     "really_gripped": false,
+     "misses": 1,
+     "exhausted": false,
+     "error": "after a missed grasp the camera could not find the object again (hand at / estimate age s: [([0.619, -0.019], {'pick_object': 2792583680.0, 'place_pad': 0.0})])",
+     "steps": 80,
+     "learnt_bias_cm": [
+      0.0,
+      0.0
+     ],
+     "stale_holds": 0,
+     "seconds": 27.3,
+     "can_truth": [
+      0.502,
+      -0.156,
+      0.024
+     ]
+    }
+   ]
+  }
+ ]
+}

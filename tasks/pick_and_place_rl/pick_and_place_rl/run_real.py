@@ -69,7 +69,7 @@ def main():
     ap.add_argument("--max-steps", type=int, default=400)
     ap.add_argument("--report", default="real_run.json")
     ap.add_argument("--closed-loop", action="store_true",
-                    help="contact + encoder feedback over the policy: grasp retry search, touchdown release, hold on a lost camera [unverified]")
+                    help="contact + encoder feedback over the policy: grasp retry search, touchdown release, hold on a lost camera; needs --grip-close < 0.020 [unverified]")
     ap.add_argument("--auto", action="store_true", help="do not prompt between steps of an episode")
     ap.add_argument("--approach-only", action="store_true",
                     help="never close the gripper: stop above the object at grasp height so a person can check alignment")

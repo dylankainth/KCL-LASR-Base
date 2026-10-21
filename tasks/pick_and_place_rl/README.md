@@ -107,13 +107,16 @@ Remaining sensitivity (these are systematic, `calibrate.py` removes a constant o
 has ~0.9 cm stride-quantisation bias (depth subsampled by 3), harmless for parking (2 cm margin).
 `python3 -m unittest discover -s test` runs the offline regression tests.
 
-### Closed-loop mode
-
-`run_real --closed-loop` adds contact and encoder feedback over the policy (`closed_loop.py`, see `REAL_ROBOT.md`). The
-unit tests cover the controllers and the `env` hooks against a fake scene; none of it has run on Gazebo or hardware.
 The extra DAgger round with noisy observations (`policy_noise_dagger.npz`) did **not** help, so `policy.npz` stays
 the default. The expert is no better than the policy under this noise, so the noise level, not the network, is
 what limits success; the numbers are within the spread expected from 30 episodes. Results files are in `results/`.
+
+### Closed-loop mode
+
+`run_real --closed-loop` (needs `--grip-close 0.016` or similar) adds feedback over the policy: encoder PI, a grasp retry
+search that learns a standing object correction, touchdown release on the pad, and a hold when the camera goes stale
+(`closed_loop.py`, details and the Gazebo evidence in `REAL_ROBOT.md`). Tested in Gazebo with `closed_loop_test.py`
+(finger contact and the hard surface are emulated there); not tested on hardware.
 
 ### Why the policy is not better, and what limits success
 

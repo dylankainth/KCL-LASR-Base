@@ -1,0 +1,122 @@
+{
+ "scenario": "touch_emul,learn",
+ "args": {
+  "scenario": "touch_emul,learn",
+  "urdf": "/ros_ws/scratch/tiago.urdf",
+  "closed_loop": false,
+  "both": false,
+  "biases": [
+   "0,0",
+   "0.02,0",
+   "0,0.03",
+   "m0.025,0"
+  ],
+  "reps": 1,
+  "closes": [
+   0.0245,
+   0.016
+  ],
+  "grip_close": null,
+  "speed_scale": 0.3,
+  "step_scale": 0.4,
+  "max_steps": 2500,
+  "sag": 0.012,
+  "tol_x": 0.015,
+  "tol_y": 0.02,
+  "episodes": 2,
+  "debug_steps": 60,
+  "pad_biases": [
+   -0.012,
+   0.0,
+   0.0035,
+   0.0055,
+   0.008,
+   0.02
+  ],
+  "z_contact": 0.945,
+  "pause_for": 6.0,
+  "report": "/ros_ws/data/cl_chain4.json"
+ },
+ "results": [
+  {
+   "scenario": "touch_emul",
+   "results": [
+    {
+     "pad_bias_cm": -1.2,
+     "place_z": 0.92,
+     "blocked_above_place_mm": 25.0,
+     "released": {
+      "step": 25,
+      "hand_z": 0.945,
+      "cmd_z": 0.9228
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 0.0,
+     "place_z": 0.932,
+     "blocked_above_place_mm": 13.0,
+     "released": {
+      "step": 24,
+      "hand_z": 0.945,
+      "cmd_z": 0.9305
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 0.4,
+     "place_z": 0.9355,
+     "blocked_above_place_mm": 9.5,
+     "released": {
+      "step": 25,
+      "hand_z": 0.945,
+      "cmd_z": 0.9258
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 0.5,
+     "place_z": 0.9375,
+     "blocked_above_place_mm": 7.5,
+     "released": {
+      "step": 25,
+      "hand_z": 0.945,
+      "cmd_z": 0.9294
+     },
+     "touchdown_releases": 1,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 0.8,
+     "place_z": 0.94,
+     "blocked_above_place_mm": 5.0,
+     "released": {
+      "step": 21,
+      "hand_z": 0.945,
+      "cmd_z": 0.9356
+     },
+     "touchdown_releases": 0,
+     "lowest_hand_z": 0.945
+    },
+    {
+     "pad_bias_cm": 2.0,
+     "place_z": 0.952,
+     "blocked_above_place_mm": -7.0,
+     "released": {
+      "step": 18,
+      "hand_z": 0.953,
+      "cmd_z": 0.9499
+     },
+     "touchdown_releases": 0,
+     "lowest_hand_z": 0.9538
+    }
+   ]
+  },
+  {
+   "crashed": "Traceback (most recent call last):\n  File \"/ros_ws/src/Base/tasks/pick_and_place_rl/pick_and_place_rl/closed_loop_test.py\", line 548, in main\n    part = SCENARIOS[name](sc, faults, arm, env, args)\n  File \"/ros_ws/src/Base/tasks/pick_and_place_rl/pick_and_place_rl/closed_loop_test.py\", line 318, in learn\n    place_scene(sc, faults, obs_bias=(b[0], b[1], 0.0))\nTypeError: place_scene() got an unexpected keyword argument 'obs_bias'\n"
+  }
+ ]
+}

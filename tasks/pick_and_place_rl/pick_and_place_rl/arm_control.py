@@ -1,11 +1,12 @@
 """Cartesian arm control on top of TiagoScene (top-down grasps, torso fixed)."""
 
 import os
+import time
 
 import numpy as np
 
 from pick_and_place_rl.kinematics import rotation_from_axes, solve_ik
-from pick_and_place_rl.robot import APPROACH_LOCAL, FINGER_LOCAL, ROUTE_JUMP, TiagoScene
+from pick_and_place_rl.robot import APPROACH_LOCAL, ARM_JOINTS, FINGER_LOCAL, ROUTE_JUMP, TiagoScene
 
 TORSO_HEIGHT = 0.35
 # A comfortable arm configuration with the hand over the table, used as the IK
@@ -104,13 +105,24 @@ class ArmController:
         sc.sleep(0.5 + sc.send_torso(TORSO_HEIGHT, 3.0))
         sc.sleep(0.5 + sc.send_arm(Q_WRIST[1:], 3.0, max_jump=ROUTE_JUMP))
         sc.sleep(0.5 + sc.send_arm(Q_UNFOLD[1:], 5.0, max_jump=ROUTE_JUMP))
-        self.q_cmd = sc.q().copy()
+        self.hold_still()
         h = self.hand_pos()
         self.move_to([0.26, h[1], 1.15], speed=0.15)  # straight up, still beside the robot
         self.move_to([0.26, -0.15, 1.15], speed=0.15)
         self.move_to([0.50, -0.15, 1.15], speed=0.15)  # across the table edge, high
         self.move_to([over_xy[0], over_xy[1], 1.15], speed=0.15)
         self.reseed([over_xy[0], over_xy[1], HOVER_Z])
+
+    def hold_still(self, timeout=10.0):
+        """Wait until the arm has stopped, then make the measured pose the new command basis.
+
+        A route ends when its duration has elapsed, not when the arm has arrived. Taking `q_cmd` from the measured
+        joints at that moment left it up to 0.25 rad away from where the arm then settled, and the first servo
+        steps swung the hand out across the table."""
+        t0 = time.time()
+        while time.time() - t0 < timeout and not self.sc.joints_still(ARM_JOINTS, window=0.5):
+            pass
+        self.q_cmd = self.sc.q().copy()
 
     def reseed(self, target, tries=30, seed=0):
         """Move (joint space, high above the table) to a clean IK solution for `target`.
@@ -138,4 +150,4 @@ class ArmController:
             raise RuntimeError(f"no IK solution for {target}")
         q = best[1]
         self.sc.sleep(0.5 + self.sc.send_arm(q[1:], 4.0, max_jump=ROUTE_JUMP))
-        self.q_cmd = self.sc.q().copy()
+        self.hold_still()

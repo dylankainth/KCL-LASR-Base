@@ -65,25 +65,52 @@ Perception picks the colour blob whose physical size fits (can cap 3-8 cm, pad 7
 3 cm off the expected height (`env.scene_problems`): that is what a wrong `--table-height` or a wrong coloured thing
 looks like. If it refuses, fix that first.
 
-### Closed-loop mode (`--closed-loop`, off by default) **[unverified]**
+### Closed-loop mode (`--closed-loop`, off by default) **[unverified on hardware]**
 
 The camera and the joint encoders disagree by a roughly constant amount (head tilt, table height, calibration), and no
 controller that only sees that disagreement can remove it. `--closed-loop` therefore closes on things that see the hand
-and the object together:
+and the object together. It needs `--grip-close` below 0.020 (e.g. `0.016`) and refuses to start otherwise: the default
+0.0245 is almost the can's radius, so an empty close would stop at the same opening as a grasp and a miss could never
+be seen. Check with `grip_test.py` that this squeeze is acceptable for the can.
 
-* **Grasp retry:** if the fingers close below `LOST_OPENING` with nothing attached, the gripper reopens and the object
-  estimate is shifted along a spiral (8 points at 1 cm, 8 at 2 cm). The offset that finally grips is kept as a standing
-  correction (max 3 cm) for the following episodes. After the spiral the episode ends. The hand slides sideways at grasp
-  height between tries, so keep `--step-scale` low.
-* **Touchdown release:** while carrying and descending over the pad, the object is released when the hand stays >1 cm
-  above its command for 3 steps, and only within 3 cm of the expected place height and 2 cm of the pad in xy.
-* **Encoder PI:** a bounded integral (max 1.5 cm) of commanded minus measured hand position, frozen during fast moves,
-  contact and gripper changes, removes arm sag and lag.
-* **Stale camera:** the arm holds still if no object/pad estimate has been accepted for 3 s while the hand is not what
-  hides it, and aborts after 10 s.
+* **Grasp judgement.** An empty close sweeps through the can's width on its way to the command, so the grasp is judged
+  only once the fingers have stopped: stopped between `LOST_OPENING` (0.020) and `CLOSED_ON_OBJ` (0.0262) = gripped,
+  below 0.020 = missed. While the fingers are at the can's width the arm holds still and the close command is kept
+  (up to 3 s), because the expert would otherwise call it "closed on nothing" and reopen before the grasp is judged.
+* **Grasp retry.** After a miss: reopen, rise, move 20 cm to the side so the hand stops hiding the object, forget the
+  latched estimate, wait for a fresh one (the pad is not needed), check the scene is still plausible, then approach
+  again with the next point of a search spiral added to the estimate (8 points at 1 cm, 8 at 2 cm). The offset that
+  finally grips becomes a standing correction (max 3 cm) for the next episodes. If the object cannot be found again
+  (it was knocked over or off the table) or the spiral is used up, the episode aborts.
+* **Touchdown release.** While carrying and descending over the pad (within 2 cm in xy, 3 cm of the expected place
+  height), the object is released when the hand has stopped (< 1 mm over 3 steps) although it is commanded down and is
+  more than 4 mm above the command, for 3 steps. The downward command is held while this is confirmed.
+* **Encoder PI.** A bounded integral (max 1.5 cm) of nominal minus measured hand position, integrated only while the hand
+  is within 1.2 cm of the command and frozen around gripper changes and suspected contact, removes arm sag and lag.
+* **Stale camera.** The arm holds still when the object or pad estimate has not been accepted for 3 s although the hand
+  is not what hides it (the object estimate is exempt while carrying, when it is frozen on purpose), and aborts after
+  100 control steps (about 10-15 s).
 
-Check in this order, arm over the object, `--approach-only` first: does the PI settle without oscillating, does a
-deliberate 1.5 cm `--calib` error get found by the retry search, does touchdown fire at the pad and never in mid-air.
+What the Gazebo tests (`closed_loop_test.py`, real-robot code path) did and did not show:
+
+| Behaviour | Result |
+| :--- | :--- |
+| Encoder PI vs a 0.012 rad shoulder offset injected into every arm command | median tracking error 6.5 -> 1.4 mm, p95 9.3 -> 4.0 mm, correction peaked at 7 mm |
+| Stale camera, hand far from the object | held still (0.2 cm drift), resumed when the camera came back; aborted after 100 steps (15 s wall) when it did not |
+| 97-step carry across the table, camera alive, object estimate frozen | 0 stale holds, released at the pad (this caught a bug that would have aborted every real carry) |
+| Long hovers and retries over the can, camera alive | 0 stale holds in every episode |
+| Touchdown, emulated hard surface 25, 13, 9.5 mm above the expert's target | released by touchdown (the expert alone would hang); command overran the hand by 1.5-2.2 cm before release |
+| Same, surface 5 mm / 1 mm above the target, or no contact | expert released by itself, 0 false touchdowns |
+| Object estimate bias 2 cm / -2.5 cm, finger contact **emulated** from ground truth | legacy believed it had gripped with the can not between the fingers; closed loop missed 4 / 1 times, grasped, learnt a correction, and the next episode grasped first try |
+| Bias 0 | no search, learnt bias stays 0, same steps as legacy |
+| Bias 3 cm in y | the biased first descent knocks the can over / off the table (also in legacy); the retry correctly aborts. The search cannot rescue a first descent that already collides. |
+
+Not shown: **any real grasp.** Gazebo's fingers close through the can, identically on the can and on empty table, so
+finger contact is emulated from ground truth in `closed_loop_test.py learn / flow` (tolerance 1.5 cm in x, 2 cm in y,
+my assumption). The touchdown surface is emulated by clamping the arm commands. Real finger stall, gripper effort,
+real arm lag and the real camera are untested. Check on the robot in this order, `--approach-only` first: does the
+PI settle without oscillating, does a deliberate 1.5 cm `--calib` error get found by the retry search, does touchdown
+fire at the pad and never in mid-air, do the fingers stop at about 0.025 on the can and go below 0.020 on nothing.
 
 The camera topic names match the ones the rest of this repo uses on the real robot. Depth must be registered to
 the RGB image (same size); both 16UC1 (mm) and 32FC1 (m) are handled. Tape-measure check: place the object at a
